@@ -1,6 +1,6 @@
 {
   "name": "@feniix/pi-text-utils",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Tiny portable text utility tools exposed as both a pi extension and an MCP server.",
   "keywords": [
     "pi",

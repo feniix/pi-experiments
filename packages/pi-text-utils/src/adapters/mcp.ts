@@ -55,7 +55,7 @@ export function registerMcpTools(server: McpToolRegistration, tools: readonly Po
 export function createMcpServer(tools: readonly PortableTool<TSchema>[]): Server {
   const byName = new Map(tools.map((tool) => [tool.name, tool]));
   const server = new Server(
-    { name: "pi-text-utils", version: "0.1.0" },
+    { name: "pi-text-utils", version: "0.2.0" },
     {
       capabilities: { tools: { listChanged: false } },
       instructions:

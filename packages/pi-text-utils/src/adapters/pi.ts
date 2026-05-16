@@ -13,7 +13,6 @@ function toPiDetails(result: PortableToolResult): Record<string, unknown> {
 
 export class PortableToolExecutionError extends Error {
   readonly details: Record<string, unknown>;
-  readonly isPortableToolError = true;
 
   constructor(result: PortableToolResult) {
     super(result.text);

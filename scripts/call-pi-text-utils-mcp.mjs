@@ -8,6 +8,17 @@ import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js"
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const serverPath = join(repoRoot, "packages/pi-text-utils/dist/src/mcp-server.js");
 const [toolName, rawArgs = "{}"] = process.argv.slice(2);
+const DEFAULT_TIMEOUT_MS = 30_000;
+
+function withTimeout(promise, label, timeoutMs = DEFAULT_TIMEOUT_MS) {
+  let timeout;
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => {
+      timeout = setTimeout(() => reject(new Error(`${label} timed out after ${timeoutMs}ms`)), timeoutMs);
+    }),
+  ]).finally(() => clearTimeout(timeout));
+}
 
 function usage() {
   console.error("Usage:");
@@ -52,8 +63,8 @@ transport.stderr?.on("data", (chunk) => {
 const client = new Client({ name: "pi-text-utils-manual-call", version: "0.1.0" });
 
 try {
-  await client.connect(transport);
-  const list = await client.listTools();
+  await withTimeout(client.connect(transport), "MCP client connect");
+  const list = await withTimeout(client.listTools(), "MCP listTools");
   const names = new Set(list.tools.map((tool) => tool.name));
   if (!names.has(toolName)) {
     console.error(`Unknown tool: ${toolName}`);
@@ -61,7 +72,10 @@ try {
     throw new Error(`Unknown tool: ${toolName}`);
   }
 
-  const result = await client.callTool({ name: toolName, arguments: parsedArgs });
+  const result = await withTimeout(
+    client.callTool({ name: toolName, arguments: parsedArgs }),
+    `MCP ${toolName} call`,
+  );
   console.log(JSON.stringify(result, null, 2));
 } catch (error) {
   if (stderr.trim()) {
@@ -69,5 +83,5 @@ try {
   }
   throw error;
 } finally {
-  await client.close();
+  await withTimeout(client.close(), "MCP client close", 5_000).catch(() => undefined);
 }
