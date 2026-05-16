@@ -1,15 +1,7 @@
 {
-  "compilerOptions": {
-    "target": "ES2022",
-    "module": "NodeNext",
-    "moduleResolution": "NodeNext",
-    "strict": true,
-    "esModuleInterop": true,
-    "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true,
-    "declaration": true,
-    "sourceMap": true,
-    "outDir": "dist"
-  },
-  "include": ["packages/*/src/**/*.ts", "packages/*/extensions/**/*.ts"]
+  "extends": "./tsconfig.base.json",
+  "files": [],
+  "references": [
+    { "path": "./packages/pi-text-utils" }
+  ]
 }

@@ -34,7 +34,7 @@ After building, run the stdio MCP server:
 
 ```bash
 npm run build
-node dist/src/mcp-server.js
+node packages/pi-text-utils/dist/src/mcp-server.js
 ```
 
 The implementation intentionally keeps tool logic in `src/tools/*` and host glue in `src/adapters/*` so the adapter pieces can later be extracted into a generalized SDK.

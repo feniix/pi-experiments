@@ -12,10 +12,11 @@
   ],
   "type": "module",
   "bin": {
-    "pi-text-utils-mcp": "./dist/packages/pi-text-utils/src/mcp-server.js"
+    "pi-text-utils-mcp": "./dist/src/mcp-server.js"
   },
   "files": [
     "dist/",
+    "src/",
     "extensions/",
     "README.md"
   ],
