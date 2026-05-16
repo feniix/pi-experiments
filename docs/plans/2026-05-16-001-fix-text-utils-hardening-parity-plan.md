@@ -1,7 +1,7 @@
 ---
 title: fix: Harden pi-text-utils packaging and parity
 type: fix
-status: active
+status: completed
 date: 2026-05-16
 deepened: 2026-05-16
 ---
