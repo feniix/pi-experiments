@@ -33,6 +33,16 @@ test("MCP server lists and calls portable tools over a transport", async () => {
       outputLength: 9,
     });
     assert.equal(result.isError, false);
+
+    const invalid = await client.callTool({
+      name: "text_transform",
+      arguments: { text: "Hello MCP", operation: "unknown" },
+    });
+    assert.equal(invalid.isError, true);
+    assert.ok(Array.isArray(invalid.content));
+    const invalidContent = invalid.content[0];
+    assert.equal(invalidContent?.type, "text");
+    assert.match(invalidContent.text, /Invalid arguments/);
   } finally {
     await client.close();
     await server.close();
