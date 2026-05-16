@@ -30,6 +30,13 @@ export function registerPiTools(pi: PiToolRegistration, tools: readonly Portable
           },
         });
 
+        if (result.isError) {
+          throw Object.assign(new Error(result.text), {
+            details: toPiDetails(result),
+            isPortableToolError: true,
+          });
+        }
+
         return {
           content: [{ type: "text", text: result.text } satisfies PiContent],
           details: toPiDetails(result),

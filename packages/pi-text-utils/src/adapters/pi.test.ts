@@ -62,3 +62,28 @@ test("registered pi tool delegates execution to the portable tool", async () => 
   });
   assert.deepEqual(updates, []);
 });
+
+test("registered pi tool rejects invalid portable tool arguments", async () => {
+  const registered: Array<{ execute: Function; name: string }> = [];
+  const pi = {
+    registerTool(tool: { execute: Function; name: string }) {
+      registered.push(tool);
+    },
+  };
+
+  registerPiTools(pi as never, textUtilsTools);
+  const transform = registered.find((tool) => tool.name === "text_transform");
+  assert.ok(transform);
+
+  await assert.rejects(
+    () =>
+      transform.execute(
+        "tool-call-invalid",
+        { text: "Hello", operation: "unknown" },
+        undefined,
+        undefined,
+        {},
+      ),
+    /Invalid arguments for text_transform/,
+  );
+});

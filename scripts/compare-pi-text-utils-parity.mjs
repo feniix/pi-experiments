@@ -52,8 +52,19 @@ function normalizeMcpResult(result) {
 async function callPiTool(name, args) {
   const tool = registeredPiTools.get(name);
   assert.ok(tool, `pi tool not registered: ${name}`);
-  const result = await tool.execute("parity-check", args, undefined, undefined, {});
-  return normalizePiResult(result);
+  try {
+    const result = await tool.execute("parity-check", args, undefined, undefined, {});
+    return normalizePiResult(result);
+  } catch (error) {
+    if (error instanceof Error && "isPortableToolError" in error) {
+      return {
+        text: error.message,
+        structured: error.details ?? {},
+        isError: true,
+      };
+    }
+    throw error;
+  }
 }
 
 let stderr = "";
@@ -85,6 +96,11 @@ const cases = [
     name: "text_stats",
     args: { text: "PORTABLE TOOL ADAPTERS" },
   },
+  {
+    label: "text_transform invalid operation",
+    name: "text_transform",
+    args: { text: "Hello", operation: "unknown" },
+  },
 ];
 
 try {
@@ -101,7 +117,7 @@ try {
     console.log(`  ${piResult.text.replace(/\n/g, "\\n")}`);
   }
 
-  console.log("\npi adapter and MCP stdio behavior match for valid tool calls.");
+  console.log("\npi adapter and MCP stdio behavior match for valid and invalid portable-tool calls.");
 } catch (error) {
   if (stderr.trim()) {
     console.error("\nServer stderr:\n" + stderr.trim());
