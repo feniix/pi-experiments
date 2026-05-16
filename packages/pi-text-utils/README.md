@@ -38,4 +38,25 @@ npm run build
 node packages/pi-text-utils/dist/src/mcp-server.js
 ```
 
+Or use the root npm wrapper:
+
+```bash
+npm run mcp:text-utils:server
+```
+
+## MCP test scripts
+
+Run the automated stdio smoke test:
+
+```bash
+npm run mcp:text-utils:smoke
+```
+
+Call one MCP tool manually and print its raw result:
+
+```bash
+npm run mcp:text-utils:call -- text_transform '{"text":"Hello MCP","operation":"reverse"}'
+npm run mcp:text-utils:call -- text_stats '{"text":"one two\nthree"}'
+```
+
 The implementation intentionally keeps tool logic in `src/tools/*` and host glue in `src/adapters/*` so the adapter pieces can later be extracted into a generalized SDK.
