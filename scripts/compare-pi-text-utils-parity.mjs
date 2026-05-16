@@ -5,11 +5,25 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
-import { registerPiTools } from "../packages/pi-text-utils/dist/src/adapters/pi.js";
+import {
+  isPortableToolExecutionError,
+  registerPiTools,
+} from "../packages/pi-text-utils/dist/src/adapters/pi.js";
 import { textUtilsTools } from "../packages/pi-text-utils/dist/src/tools/index.js";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const serverPath = join(repoRoot, "packages/pi-text-utils/dist/src/mcp-server.js");
+const DEFAULT_TIMEOUT_MS = 30_000;
+
+function withTimeout(promise, label, timeoutMs = DEFAULT_TIMEOUT_MS) {
+  let timeout;
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => {
+      timeout = setTimeout(() => reject(new Error(`${label} timed out after ${timeoutMs}ms`)), timeoutMs);
+    }),
+  ]).finally(() => clearTimeout(timeout));
+}
 
 if (!existsSync(serverPath)) {
   console.error(`Missing built MCP server: ${serverPath}`);
@@ -56,10 +70,10 @@ async function callPiTool(name, args) {
     const result = await tool.execute("parity-check", args, undefined, undefined, {});
     return normalizePiResult(result);
   } catch (error) {
-    if (error instanceof Error && "isPortableToolError" in error) {
+    if (isPortableToolExecutionError(error)) {
       return {
         text: error.message,
-        structured: error.details ?? {},
+        structured: error.details,
         isError: true,
       };
     }
@@ -104,12 +118,15 @@ const cases = [
 ];
 
 try {
-  await client.connect(transport);
+  await withTimeout(client.connect(transport), "MCP client connect");
 
   for (const testCase of cases) {
     const piResult = await callPiTool(testCase.name, testCase.args);
     const mcpResult = normalizeMcpResult(
-      await client.callTool({ name: testCase.name, arguments: testCase.args }),
+      await withTimeout(
+        client.callTool({ name: testCase.name, arguments: testCase.args }),
+        `MCP ${testCase.name} call`,
+      ),
     );
 
     assert.deepEqual(mcpResult, piResult);
@@ -124,5 +141,5 @@ try {
   }
   throw error;
 } finally {
-  await client.close();
+  await withTimeout(client.close(), "MCP client close", 5_000).catch(() => undefined);
 }

@@ -6,18 +6,30 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import { promisify } from "node:util";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 
 const execFile = promisify(execFileCallback);
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const DEFAULT_TIMEOUT_MS = 30_000;
+
+function withTimeout(promise, label, timeoutMs = DEFAULT_TIMEOUT_MS) {
+  let timeout;
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => {
+      timeout = setTimeout(() => reject(new Error(`${label} timed out after ${timeoutMs}ms`)), timeoutMs);
+    }),
+  ]).finally(() => clearTimeout(timeout));
+}
 
 async function run(command, args, options = {}) {
   try {
     return await execFile(command, args, {
       cwd: repoRoot,
       maxBuffer: 10 * 1024 * 1024,
+      timeout: DEFAULT_TIMEOUT_MS,
       ...options,
     });
   } catch (error) {
@@ -64,12 +76,28 @@ try {
   const installedPackageDir = join(installDir, "node_modules", "@feniix", "pi-text-utils");
   const installedServer = join(installedPackageDir, "dist", "src", "mcp-server.js");
   const installedPiExtension = join(installedPackageDir, "dist", "extensions", "index.js");
+  const installedBin = join(
+    installDir,
+    "node_modules",
+    ".bin",
+    process.platform === "win32" ? "pi-text-utils-mcp.cmd" : "pi-text-utils-mcp",
+  );
   assert.ok(existsSync(installedServer), `missing installed MCP server entrypoint: ${installedServer}`);
   assert.ok(existsSync(installedPiExtension), `missing installed pi extension entrypoint: ${installedPiExtension}`);
+  assert.ok(existsSync(installedBin), `missing installed MCP bin shim: ${installedBin}`);
+
+  const extensionModule = await import(pathToFileURL(installedPiExtension).href);
+  const registeredTools = [];
+  extensionModule.default({
+    registerTool(tool) {
+      registeredTools.push(tool.name);
+    },
+  });
+  assert.deepEqual(registeredTools.sort(), ["text_stats", "text_transform"]);
 
   const transport = new StdioClientTransport({
-    command: process.execPath,
-    args: [installedServer],
+    command: installedBin,
+    args: [],
     cwd: installDir,
     stderr: "pipe",
   });
@@ -78,12 +106,15 @@ try {
   });
 
   client = new Client({ name: "pi-text-utils-package-smoke", version: "0.1.0" });
-  await client.connect(transport);
+  await withTimeout(client.connect(transport), "MCP client connect");
 
-  const result = await client.callTool({
-    name: "text_transform",
-    arguments: { text: "Installed Package Smoke", operation: "slugify" },
-  });
+  const result = await withTimeout(
+    client.callTool({
+      name: "text_transform",
+      arguments: { text: "Installed Package Smoke", operation: "slugify" },
+    }),
+    "MCP text_transform call",
+  );
 
   assert.equal(textFromContent(result.content), "installed-package-smoke");
   assert.deepEqual(result.structuredContent, {
@@ -97,7 +128,7 @@ try {
 
   console.log("✓ packed package installs into a clean temp project");
   console.log("✓ installed MCP bin serves text_transform from declared dependencies");
-  console.log("✓ installed package includes pi extension entrypoint");
+  console.log("✓ installed package includes and loads pi extension entrypoint");
 } catch (error) {
   if (stderr.trim()) {
     console.error("\nInstalled server stderr:\n" + stderr.trim());
@@ -107,7 +138,7 @@ try {
   }
   throw error;
 } finally {
-  await client?.close().catch(() => undefined);
+  await withTimeout(client?.close?.() ?? Promise.resolve(), "MCP client close", 5_000).catch(() => undefined);
   if (tempRoot) {
     await rm(tempRoot, { recursive: true, force: true }).catch(() => undefined);
   }

@@ -11,6 +11,21 @@ function toPiDetails(result: PortableToolResult): Record<string, unknown> {
   return result.details ?? result.structuredContent ?? {};
 }
 
+export class PortableToolExecutionError extends Error {
+  readonly details: Record<string, unknown>;
+  readonly isPortableToolError = true;
+
+  constructor(result: PortableToolResult) {
+    super(result.text);
+    this.name = "PortableToolExecutionError";
+    this.details = toPiDetails(result);
+  }
+}
+
+export function isPortableToolExecutionError(error: unknown): error is PortableToolExecutionError {
+  return error instanceof PortableToolExecutionError;
+}
+
 export function registerPiTools(pi: PiToolRegistration, tools: readonly PortableTool<TSchema>[]): void {
   for (const tool of tools) {
     pi.registerTool({
@@ -31,10 +46,7 @@ export function registerPiTools(pi: PiToolRegistration, tools: readonly Portable
         });
 
         if (result.isError) {
-          throw Object.assign(new Error(result.text), {
-            details: toPiDetails(result),
-            isPortableToolError: true,
-          });
+          throw new PortableToolExecutionError(result);
         }
 
         return {
