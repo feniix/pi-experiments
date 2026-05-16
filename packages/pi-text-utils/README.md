@@ -64,6 +64,12 @@ Run the automated stdio smoke test:
 npm run mcp:text-utils:smoke
 ```
 
+Run the package smoke test, which packs the package, installs it into a clean temp project, and calls the installed MCP bin:
+
+```bash
+npm run mcp:text-utils:package-smoke
+```
+
 Call one MCP tool manually and print its raw result:
 
 ```bash
