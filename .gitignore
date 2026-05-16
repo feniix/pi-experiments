@@ -6,5 +6,6 @@ node_modules/
 .claude/settings.local.json
 *.tgz
 coverage/
+dist/
 .claude/
 .envrc.local

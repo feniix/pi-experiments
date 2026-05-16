@@ -1,0 +1,38 @@
+{
+  "name": "@feniix/pi-text-utils",
+  "version": "0.1.0",
+  "description": "Tiny portable text utility tools exposed as both a pi extension and an MCP server.",
+  "keywords": [
+    "pi",
+    "pi-package",
+    "pi-extension",
+    "mcp",
+    "portable-tools",
+    "text-utils"
+  ],
+  "type": "module",
+  "bin": {
+    "pi-text-utils-mcp": "./dist/packages/pi-text-utils/src/mcp-server.js"
+  },
+  "files": [
+    "dist/",
+    "extensions/",
+    "README.md"
+  ],
+  "pi": {
+    "extensions": [
+      "./extensions/index.ts"
+    ]
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "*",
+    "@modelcontextprotocol/sdk": "*",
+    "typebox": "*"
+  },
+  "peerDependenciesMeta": {
+    "@earendil-works/pi-coding-agent": { "optional": true },
+    "@modelcontextprotocol/sdk": { "optional": true },
+    "typebox": { "optional": true }
+  },
+  "license": "MIT"
+}

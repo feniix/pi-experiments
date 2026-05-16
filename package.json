@@ -1,0 +1,21 @@
+{
+  "name": "pi-experiments",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "node --test dist/**/*.test.js",
+    "build": "tsc -p tsconfig.json"
+  },
+  "devDependencies": {
+    "@earendil-works/pi-coding-agent": "^0.74.0",
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "@types/node": "^22.19.17",
+    "typescript": "^5.5.0",
+    "typebox": "^1.1.31"
+  }
+}
