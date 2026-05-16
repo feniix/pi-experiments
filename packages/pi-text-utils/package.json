@@ -19,11 +19,15 @@
     "dist/**/*.d.ts",
     "!dist/**/*.test.*",
     "!dist/tsconfig.tsbuildinfo",
+    "prompts/",
     "README.md"
   ],
   "pi": {
     "extensions": [
       "./dist/extensions/index.js"
+    ],
+    "prompts": [
+      "./prompts"
     ]
   },
   "peerDependencies": {

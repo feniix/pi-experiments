@@ -44,6 +44,18 @@ Or use the root npm wrapper:
 npm run mcp:text-utils:server
 ```
 
+## pi prompt tests
+
+After loading the package in pi, use these prompt templates to exercise the tools:
+
+```text
+/text-transform
+/text-stats
+/text-utils-combined
+```
+
+Each prompt is stored under `prompts/` and asks pi to call the registered tools.
+
 ## MCP test scripts
 
 Run the automated stdio smoke test:
