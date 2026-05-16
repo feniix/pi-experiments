@@ -8,6 +8,7 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 import type { TSchema } from "typebox";
 import type { PortableTool, PortableToolResult } from "../portable/define-tool.js";
+import { executePortableTool } from "../portable/execute-tool.js";
 
 type McpToolRegistration = {
   registerTool(name: string, config: Record<string, unknown>, callback: (args: unknown, extra: unknown) => unknown): unknown;
@@ -41,7 +42,7 @@ export function registerMcpTools(server: McpToolRegistration, tools: readonly Po
         inputSchema: tool.parameters,
       },
       async (args: unknown, extra: unknown) => {
-        const result = await tool.execute(args as never, {
+        const result = await executePortableTool(tool, args, {
           host: "mcp",
           signal: signalFromExtra(extra),
         });
@@ -82,7 +83,7 @@ export function createMcpServer(tools: readonly PortableTool<TSchema>[]): Server
       } satisfies CallToolResult;
     }
 
-    const result = await tool.execute((request.params.arguments ?? {}) as never, {
+    const result = await executePortableTool(tool, request.params.arguments ?? {}, {
       host: "mcp",
       signal: signalFromExtra(extra),
     });

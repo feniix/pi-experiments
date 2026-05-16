@@ -1,6 +1,7 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import type { TSchema } from "typebox";
 import type { PortableTool, PortableToolResult } from "../portable/define-tool.js";
+import { executePortableTool } from "../portable/execute-tool.js";
 
 type PiToolRegistration = Pick<ExtensionAPI, "registerTool">;
 
@@ -18,7 +19,7 @@ export function registerPiTools(pi: PiToolRegistration, tools: readonly Portable
       description: tool.description,
       parameters: tool.parameters,
       async execute(_toolCallId, params, signal, onUpdate, _ctx) {
-        const result = await tool.execute(params, {
+        const result = await executePortableTool(tool, params, {
           host: "pi",
           signal,
           progress(update) {
