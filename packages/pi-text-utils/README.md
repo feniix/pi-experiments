@@ -71,4 +71,10 @@ npm run mcp:text-utils:call -- text_transform '{"text":"Hello MCP","operation":"
 npm run mcp:text-utils:call -- text_stats '{"text":"one two\nthree"}'
 ```
 
+Compare pi-adapter execution against MCP stdio execution for the same valid tool calls:
+
+```bash
+npm run mcp:text-utils:parity
+```
+
 The implementation intentionally keeps tool logic in `src/tools/*` and host glue in `src/adapters/*` so the adapter pieces can later be extracted into a generalized SDK.
