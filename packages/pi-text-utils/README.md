@@ -22,9 +22,10 @@ The pi package entrypoint is:
 }
 ```
 
-Run locally with pi from this repo root:
+Build, then run locally with pi from this repo root:
 
 ```bash
+npm run build
 pi -e ./packages/pi-text-utils
 ```
 

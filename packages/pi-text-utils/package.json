@@ -15,14 +15,15 @@
     "pi-text-utils-mcp": "./dist/src/mcp-server.js"
   },
   "files": [
-    "dist/",
-    "src/",
-    "extensions/",
+    "dist/**/*.js",
+    "dist/**/*.d.ts",
+    "!dist/**/*.test.*",
+    "!dist/tsconfig.tsbuildinfo",
     "README.md"
   ],
   "pi": {
     "extensions": [
-      "./extensions/index.ts"
+      "./dist/extensions/index.js"
     ]
   },
   "peerDependencies": {
