@@ -91,7 +91,7 @@ try {
   const sdkPack = await run("npm", [
     "pack",
     "--workspace",
-    "@feniix/pi-portable-tools",
+    "@feniix/bridgekit",
     "--pack-destination",
     packDir,
     "--json",
@@ -127,7 +127,7 @@ try {
     "pi-sequential-thinking",
     "node_modules",
     "@feniix",
-    "pi-portable-tools",
+    "bridgekit",
   );
   assert.ok(
     existsSync(join(bundledSdkDir, "dist", "src", "mcp.js")),
@@ -182,7 +182,7 @@ try {
     cwd: installDir,
   });
 
-  const installedSdkDir = join(installDir, "node_modules", "@feniix", "pi-portable-tools");
+  const installedSdkDir = join(installDir, "node_modules", "@feniix", "bridgekit");
   const installedPackageDir = join(installDir, "node_modules", "@feniix", "pi-sequential-thinking");
   const installedServer = join(installedPackageDir, "dist", "src", "mcp-server.js");
   const installedPiExtension = join(installedPackageDir, "dist", "extensions", "index.js");
@@ -201,7 +201,7 @@ try {
 
   const sequentialPackage = await readJson(join(installedPackageDir, "package.json"));
   const sdkPackage = await readJson(join(installedSdkDir, "package.json"));
-  const sdkRange = sequentialPackage.dependencies?.["@feniix/pi-portable-tools"];
+  const sdkRange = sequentialPackage.dependencies?.["@feniix/bridgekit"];
   assert.equal(sdkRange, "0.2.0");
   assert.doesNotMatch(sdkRange, /^(workspace:|file:)/);
   assert.equal(sdkPackage.version, "0.2.0");

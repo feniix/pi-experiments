@@ -18,8 +18,8 @@
     "pi-text-utils-mcp": "./dist/src/mcp-server.js"
   },
   "scripts": {
-    "build": "npm run build --workspace @feniix/pi-portable-tools && node ../../scripts/clean-package-dist.mjs && tsc -b tsconfig.json",
-    "prepack": "npm run build && node ../../scripts/vendor-pi-portable-tools-for-pack.mjs && node ../../scripts/verify-pi-text-utils-dist.mjs",
+    "build": "npm run build --workspace @feniix/bridgekit && node ../../scripts/clean-package-dist.mjs && tsc -b tsconfig.json",
+    "prepack": "npm run build && node ../../scripts/vendor-bridgekit-for-pack.mjs && node ../../scripts/verify-pi-text-utils-dist.mjs",
     "postpack": "node ../../scripts/cleanup-pi-text-utils-vendor.mjs"
   },
   "files": [
@@ -39,12 +39,12 @@
     ]
   },
   "dependencies": {
-    "@feniix/pi-portable-tools": "0.2.0",
+    "@feniix/bridgekit": "0.2.0",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "typebox": "^1.1.31"
   },
   "bundleDependencies": [
-    "@feniix/pi-portable-tools"
+    "@feniix/bridgekit"
   ],
   "peerDependencies": {
     "@earendil-works/pi-coding-agent": "*"

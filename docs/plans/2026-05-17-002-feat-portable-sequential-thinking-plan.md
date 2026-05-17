@@ -9,7 +9,7 @@ date: 2026-05-17
 
 ## Summary
 
-Create `packages/pi-sequential-thinking` by porting the existing `../pi-extensions/packages/pi-sequential-thinking` behavior into this repo’s portable-tool architecture. The new package must expose the same sequential-thinking tool behavior through both a native pi extension and an MCP stdio server, with shared TypeBox-backed portable tool definitions built on `@feniix/pi-portable-tools`.
+Create `packages/pi-sequential-thinking` by porting the existing `../pi-extensions/packages/pi-sequential-thinking` behavior into this repo’s portable-tool architecture. The new package must expose the same sequential-thinking tool behavior through both a native pi extension and an MCP stdio server, with shared TypeBox-backed portable tool definitions built on `@feniix/bridgekit`.
 
 ---
 
@@ -24,8 +24,8 @@ The source `pi-sequential-thinking` package currently works only as a native pi 
 *This plan was authored without synchronous user confirmation. The items below are agent inferences that fill gaps in the input — un-validated bets that should be reviewed before implementation proceeds.*
 
 - “Behave the same way” means preserve the user-visible behavior and data contracts of the source pi extension for existing tools, storage layout, validation messages, receipts, config precedence, and content-free status output unless a host transport requires a different envelope.
-- MCP support should use the existing low-level MCP adapter from `@feniix/pi-portable-tools/mcp`; no new MCP helper API belongs in the SDK for this work.
-- Because `@feniix/pi-portable-tools` is not assumed to be published yet, the new package should mirror `pi-text-utils` and bundle the SDK dependency for packed-install smoke tests.
+- MCP support should use the existing low-level MCP adapter from `@feniix/bridgekit/mcp`; no new MCP helper API belongs in the SDK for this work.
+- Because `@feniix/bridgekit` is not assumed to be published yet, the new package should mirror `pi-text-utils` and bundle the SDK dependency for packed-install smoke tests.
 - Tests remain repo/dev artifacts and should not be included in npm tarballs.
 
 ---
@@ -35,7 +35,7 @@ The source `pi-sequential-thinking` package currently works only as a native pi 
 ### Package shape
 
 - R1. Add `packages/pi-sequential-thinking` as an npm workspace package with Node `>=20`, ESM-only TypeScript build output, package metadata, pi extension entrypoint, and MCP stdio bin entrypoint.
-- R3. Define the tools once as `@feniix/pi-portable-tools` portable tools and reuse that definition for both pi and MCP hosts.
+- R3. Define the tools once as `@feniix/bridgekit` portable tools and reuse that definition for both pi and MCP hosts.
 
 ### Behavior parity
 
@@ -58,7 +58,7 @@ The source `pi-sequential-thinking` package currently works only as a native pi 
 ## Scope Boundaries
 
 - Do not add new sequential-thinking tools, stages, storage backends, locking, network transports, prompts, or product behavior beyond MCP access to the existing tools.
-- Do not change the `@feniix/pi-portable-tools` public API unless a preservation test proves it is unavoidable; prefer package-local adapters for source-package compatibility details.
+- Do not change the `@feniix/bridgekit` public API unless a preservation test proves it is unavoidable; prefer package-local adapters for source-package compatibility details.
 - Do not generalize shared packaging scripts beyond the minimum needed to let a second bundled SDK consumer pack cleanly while keeping existing `pi-text-utils` behavior green.
 - Do not publish to npm.
 - Do not remove or alter existing `pi-text-utils` behavior.
@@ -66,7 +66,7 @@ The source `pi-sequential-thinking` package currently works only as a native pi 
 
 ### Deferred to Follow-Up Work
 
-- Remove SDK bundling workarounds after `@feniix/pi-portable-tools` is published and downstream packages can depend on it normally.
+- Remove SDK bundling workarounds after `@feniix/bridgekit` is published and downstream packages can depend on it normally.
 - Add a lock or multi-writer coordination strategy for shared storage directories only if a future experiment requires concurrent writers.
 
 ---
@@ -76,7 +76,7 @@ The source `pi-sequential-thinking` package currently works only as a native pi 
 ### Relevant Code and Patterns
 
 - `packages/pi-text-utils/package.json`, `packages/pi-text-utils/extensions/index.ts`, `packages/pi-text-utils/src/mcp-server.ts`, and `packages/pi-text-utils/src/tools/index.ts` show the current portable package, pi extension, and MCP server pattern.
-- `packages/pi-portable-tools/src/core/define-tool.ts`, `packages/pi-portable-tools/src/adapters/pi.ts`, and `packages/pi-portable-tools/src/adapters/mcp.ts` define the SDK contract and supported host adapters.
+- `packages/bridgekit/src/core/define-tool.ts`, `packages/bridgekit/src/adapters/pi.ts`, and `packages/bridgekit/src/adapters/mcp.ts` define the SDK contract and supported host adapters.
 - `scripts/smoke-pi-text-utils-package.mjs`, `scripts/verify-pi-text-utils-dist.mjs`, and `scripts/run-built-tests.mjs` show package-smoke and built-test conventions.
 - `../pi-extensions/packages/pi-sequential-thinking/extensions/index.ts`, `types.ts`, `storage.ts`, and `analyzer.ts` are the source behavior to port and characterize.
 - Root `package.json` and `tsconfig.json` need workspace scripts/references for the new package.
@@ -101,7 +101,7 @@ The source `pi-sequential-thinking` package currently works only as a native pi 
 - Treat source runtime normalizers as the authoritative validation layer for behavior-sensitive inputs. Portable TypeBox schemas should stay permissive for fields such as `stage`, aliases, and optional runtime-required values when strict schema validation would preempt source-compatible validation messages or case-insensitive normalization.
 - Preserve pi’s current user-visible error envelope with a package-local pi registration wrapper, because the generic SDK pi adapter throws on `isError` portable results while the source package returns `{ content, details, isError: true }`. This wrapper still uses `definePortableTool` and `executePortableTool` from the SDK, with permissive schemas preventing SDK pre-validation from replacing source errors.
 - Use local output-formatting utilities for truncation and size formatting instead of importing `@earendil-works/pi-coding-agent` at runtime from portable code. The pi host package remains a type-only optional peer.
-- MCP should use `runMcpStdioServer` from `@feniix/pi-portable-tools/mcp` and the same portable tools. MCP-specific differences should be limited to MCP’s standard `content`, `structuredContent`, and `isError` envelope.
+- MCP should use `runMcpStdioServer` from `@feniix/bridgekit/mcp` and the same portable tools. MCP-specific differences should be limited to MCP’s standard `content`, `structuredContent`, and `isError` envelope.
 - Keep tests as characterization plus parity tests. The safest path is to copy source tests, retarget imports to the new package structure, then add MCP and package-smoke tests around the same behavior.
 - Minimally extend SDK vendoring support so a second bundled SDK consumer can pack cleanly without disrupting `pi-text-utils` package smoke.
 
@@ -146,7 +146,7 @@ The source `pi-sequential-thinking` package currently works only as a native pi 
       smoke-pi-sequential-thinking-mcp.mjs
       smoke-pi-sequential-thinking-package.mjs
       verify-pi-sequential-thinking-dist.mjs
-      vendor-pi-portable-tools-for-pack.mjs
+      vendor-bridgekit-for-pack.mjs
 
 ---
 
@@ -160,7 +160,7 @@ flowchart LR
   Factory --> Tools[PortableTool definitions\nTypeBox schemas + execute]
   Tools --> Pi[pi extension wrapper\nflags + compatible result envelope + progress]
   Tools --> MCP[MCP stdio server\nrunMcpStdioServer]
-  SDK[@feniix/pi-portable-tools\ndefine/execute + MCP adapter] --> Factory
+  SDK[@feniix/bridgekit\ndefine/execute + MCP adapter] --> Factory
   SDK --> Pi
   SDK --> MCP
 ```
@@ -284,7 +284,7 @@ The shared portable tools own behavior. Host entrypoints own only host-specific 
 **Patterns to follow:**
 - `packages/pi-text-utils/src/tools/text-transform.ts`
 - Source tool implementations inside `../pi-extensions/packages/pi-sequential-thinking/extensions/index.ts`
-- `packages/pi-portable-tools/src/core/execute-tool.test.ts`
+- `packages/bridgekit/src/core/execute-tool.test.ts`
 
 **Test scenarios:**
 - Happy path: `process_thought` records a thought, returns analysis and receipt metadata, and supports camelCase aliases.
@@ -324,7 +324,7 @@ The shared portable tools own behavior. Host entrypoints own only host-specific 
 
 **Patterns to follow:**
 - `packages/pi-text-utils/extensions/index.ts`
-- `@feniix/pi-portable-tools/pi` adapter behavior as a reference, not a mandatory envelope when source compatibility requires package-local handling
+- `@feniix/bridgekit/pi` adapter behavior as a reference, not a mandatory envelope when source compatibility requires package-local handling
 - `../pi-extensions/packages/pi-sequential-thinking/__tests__/index.test.ts`
 - `../pi-extensions/packages/pi-sequential-thinking/__tests__/runtime.test.ts`
 
@@ -357,7 +357,7 @@ The shared portable tools own behavior. Host entrypoints own only host-specific 
 **Approach:**
 - Implement MCP startup with `runMcpStdioServer` and server metadata resolved in `src/mcp-server.ts` without a separate metadata abstraction.
 - Use only the source-compatible config inputs that are available to the MCP process, preserving existing env/config/default semantics where applicable; do not add MCP-specific config keys, prompts, flags, or precedence layers.
-- Add in-memory MCP integration tests using the already-exported `createMcpServer` from `@feniix/pi-portable-tools/mcp`, plus stdio smoke tests following existing text-utils patterns.
+- Add in-memory MCP integration tests using the already-exported `createMcpServer` from `@feniix/bridgekit/mcp`, plus stdio smoke tests following existing text-utils patterns.
 - Add only the root smoke/package verification scripts needed by existing repo conventions; rely on the package MCP bin as the executable server entrypoint.
 
 **Execution note:** Test-first. Add MCP integration tests that fail while no MCP server exists, then implement the server.
@@ -390,7 +390,7 @@ The shared portable tools own behavior. Host entrypoints own only host-specific 
 **Files:**
 - Create: `scripts/verify-pi-sequential-thinking-dist.mjs`
 - Create: `scripts/smoke-pi-sequential-thinking-package.mjs`
-- Modify: `scripts/vendor-pi-portable-tools-for-pack.mjs`
+- Modify: `scripts/vendor-bridgekit-for-pack.mjs`
 - Create: `scripts/cleanup-pi-sequential-thinking-vendor.mjs`
 - Modify: `packages/pi-sequential-thinking/package.json`
 - Modify: `package.json`
@@ -406,7 +406,7 @@ The shared portable tools own behavior. Host entrypoints own only host-specific 
 **Patterns to follow:**
 - `scripts/verify-pi-text-utils-dist.mjs`
 - `scripts/smoke-pi-text-utils-package.mjs`
-- `scripts/vendor-pi-portable-tools-for-pack.mjs`
+- `scripts/vendor-bridgekit-for-pack.mjs`
 - `scripts/cleanup-pi-text-utils-vendor.mjs`
 
 **Test scenarios:**
@@ -495,7 +495,7 @@ The shared portable tools own behavior. Host entrypoints own only host-specific 
 
 - Source package: `../pi-extensions/packages/pi-sequential-thinking`
 - Portable package pattern: `packages/pi-text-utils`
-- SDK package: `packages/pi-portable-tools`
+- SDK package: `packages/bridgekit`
 - Architecture plan: `docs/architecture/plan-dual-pi-mcp-tool-sdk-experiment.md`
 - SDK extraction plan: `docs/plans/2026-05-16-002-extract-portable-tool-sdk-plan.md`
 - Package hardening plan: `docs/plans/2026-05-16-001-fix-text-utils-hardening-parity-plan.md`

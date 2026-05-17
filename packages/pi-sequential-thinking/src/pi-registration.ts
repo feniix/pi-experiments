@@ -1,4 +1,4 @@
-import type { PortableTool, PortableToolResult } from "@feniix/pi-portable-tools";
+import type { PortableTool, PortableToolResult } from "@feniix/bridgekit";
 import type { TSchema } from "typebox";
 
 export type PiContent = { type: "text"; text: string };

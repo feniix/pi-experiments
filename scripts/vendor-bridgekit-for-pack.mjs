@@ -6,14 +6,14 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const sdkRoot = join(repoRoot, "packages", "pi-portable-tools");
+const sdkRoot = join(repoRoot, "packages", "bridgekit");
 const targetPackage = process.argv[2] ?? "pi-text-utils";
 const targetRoot = join(repoRoot, "packages", targetPackage);
-const vendorRoot = join(targetRoot, "node_modules", "@feniix", "pi-portable-tools");
+const vendorRoot = join(targetRoot, "node_modules", "@feniix", "bridgekit");
 
 assert.match(targetPackage, /^pi-[a-z0-9-]+$/, "target package must be a local pi-* package directory name");
 assert.ok(existsSync(targetRoot), `unknown target package: ${targetPackage}`);
-assert.ok(existsSync(join(sdkRoot, "dist", "src", "index.js")), "build @feniix/pi-portable-tools before vendoring it");
+assert.ok(existsSync(join(sdkRoot, "dist", "src", "index.js")), "build @feniix/bridgekit before vendoring it");
 assert.ok(existsSync(join(sdkRoot, "dist", "src", "pi.js")), "missing built pi SDK entrypoint");
 assert.ok(existsSync(join(sdkRoot, "dist", "src", "mcp.js")), "missing built MCP SDK entrypoint");
 
@@ -32,4 +32,4 @@ if (targetPackage !== "pi-text-utils") {
 }
 await Promise.all(copyTasks);
 
-console.error(`✓ vendored @feniix/pi-portable-tools for ${targetPackage} packing`);
+console.error(`✓ vendored @feniix/bridgekit for ${targetPackage} packing`);

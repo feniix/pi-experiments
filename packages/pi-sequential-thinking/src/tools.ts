@@ -1,5 +1,5 @@
 import { join } from "node:path";
-import { definePortableTool, type PortableTool, type PortableToolResult } from "@feniix/pi-portable-tools";
+import { definePortableTool, type PortableTool, type PortableToolResult } from "@feniix/bridgekit";
 import { type TObject, Type } from "typebox";
 import { ThoughtAnalyzer } from "./analyzer.js";
 import {

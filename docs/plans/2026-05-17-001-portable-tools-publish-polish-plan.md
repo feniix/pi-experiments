@@ -1,15 +1,15 @@
 ---
-title: Polish pi-portable-tools Publish Contract
+title: Polish BridgeKit Publish Contract
 type: refactor
 status: completed
 date: 2026-05-17
 ---
 
-# Polish pi-portable-tools Publish Contract
+# Polish BridgeKit Publish Contract
 
 ## Summary
 
-Tighten `@feniix/pi-portable-tools` as a publishable TypeScript SDK by making package metadata explicit, keeping emitted source-map behavior consistent with the tarball, and widening the host context type for future adapters without changing current pi or MCP runtime behavior.
+Tighten `@feniix/bridgekit` as a publishable TypeScript SDK by making package metadata explicit, keeping emitted source-map behavior consistent with the tarball, and widening the host context type for future adapters without changing current pi or MCP runtime behavior.
 
 ---
 
@@ -31,8 +31,8 @@ The SDK extraction has a good modern ESM/TypeScript foundation, but a few librar
 
 ## Requirements
 
-- R1. `packages/pi-portable-tools/package.json` must explicitly advertise runtime entry metadata for modern and older tooling: `exports`, `main`, `types`, `engines`, and `sideEffects`.
-- R2. The packed `@feniix/pi-portable-tools` tarball must not contain JavaScript files with dangling `sourceMappingURL` comments.
+- R1. `packages/bridgekit/package.json` must explicitly advertise runtime entry metadata for modern and older tooling: `exports`, `main`, `types`, `engines`, and `sideEffects`.
+- R2. The packed `@feniix/bridgekit` tarball must not contain JavaScript files with dangling `sourceMappingURL` comments.
 - R3. `PortableToolContext.host` must accept existing first-party hosts and future custom adapter host identifiers without loosening the rest of the context contract or breaking the default closed first-party host union used by existing consumers.
 - R4. Existing root, pi, and MCP public entrypoints must remain stable; no unsupported helper such as `registerMcpTools` may reappear.
 - R5. The work must be implemented test-first/types-first and verified through the existing typecheck, test, and package-smoke flows.
@@ -42,7 +42,7 @@ The SDK extraction has a good modern ESM/TypeScript foundation, but a few librar
 ## Scope Boundaries
 
 - Do not add CommonJS or dual-package output.
-- Do not split `@feniix/pi-portable-tools` into separate core/pi/MCP packages in this branch.
+- Do not split `@feniix/bridgekit` into separate core/pi/MCP packages in this branch.
 - Do not publish to npm.
 - Do not change pi or MCP runtime behavior beyond type/metadata/package-output polish.
 - Do not add new text utility behavior.
@@ -53,10 +53,10 @@ The SDK extraction has a good modern ESM/TypeScript foundation, but a few librar
 
 ### Relevant Code and Patterns
 
-- `packages/pi-portable-tools/package.json` already uses explicit `exports`, `files`, `prepack`, and dependency declarations.
-- `packages/pi-portable-tools/tsconfig.json` inherits root `sourceMap: true`, which currently produces `.js` files containing `sourceMappingURL` comments while the package `files` field excludes `.js.map` files.
-- `packages/pi-portable-tools/src/core/define-tool.ts` defines `PortableToolContext.host` as the closed union `"pi" | "mcp" | "test"`.
-- `scripts/verify-pi-portable-tools-dist.mjs` is the right place to assert package-output invariants before packing.
+- `packages/bridgekit/package.json` already uses explicit `exports`, `files`, `prepack`, and dependency declarations.
+- `packages/bridgekit/tsconfig.json` inherits root `sourceMap: true`, which currently produces `.js` files containing `sourceMappingURL` comments while the package `files` field excludes `.js.map` files.
+- `packages/bridgekit/src/core/define-tool.ts` defines `PortableToolContext.host` as the closed union `"pi" | "mcp" | "test"`.
+- `scripts/verify-bridgekit-dist.mjs` is the right place to assert package-output invariants before packing.
 - `scripts/smoke-pi-text-utils-package.mjs` already verifies installed SDK runtime exports and declaration imports from a packed install.
 
 ### Institutional Learnings
@@ -93,7 +93,7 @@ The SDK extraction has a good modern ESM/TypeScript foundation, but a few librar
 
 ### Deferred to Implementation
 
-- None. Package-output assertions belong in `scripts/verify-pi-portable-tools-dist.mjs`; installed-consumer declaration checks belong in `scripts/smoke-pi-text-utils-package.mjs` only where they uniquely prove packed-install behavior.
+- None. Package-output assertions belong in `scripts/verify-bridgekit-dist.mjs`; installed-consumer declaration checks belong in `scripts/smoke-pi-text-utils-package.mjs` only where they uniquely prove packed-install behavior.
 
 ---
 
@@ -108,9 +108,9 @@ The SDK extraction has a good modern ESM/TypeScript foundation, but a few librar
 **Dependencies:** None
 
 **Files:**
-- Modify: `packages/pi-portable-tools/package.json`
-- Modify: `scripts/verify-pi-portable-tools-dist.mjs`
-- Test: `scripts/verify-pi-portable-tools-dist.mjs`
+- Modify: `packages/bridgekit/package.json`
+- Modify: `scripts/verify-bridgekit-dist.mjs`
+- Test: `scripts/verify-bridgekit-dist.mjs`
 - Test: `scripts/smoke-pi-text-utils-package.mjs` *(verification only; modify only if installed-consumer behavior needs extra proof)*
 
 **Approach:**
@@ -120,7 +120,7 @@ The SDK extraction has a good modern ESM/TypeScript foundation, but a few librar
 **Execution note:** Test-first. Add the failing verifier assertions before changing `package.json`.
 
 **Patterns to follow:**
-- Existing assertions in `scripts/verify-pi-portable-tools-dist.mjs`
+- Existing assertions in `scripts/verify-bridgekit-dist.mjs`
 - Installed SDK export checks in `scripts/smoke-pi-text-utils-package.mjs`
 
 **Test scenarios:**
@@ -132,7 +132,7 @@ The SDK extraction has a good modern ESM/TypeScript foundation, but a few librar
 - Public entrypoint files continue to assert that `registerMcpTools` is absent.
 
 **Verification:**
-- `npm run prepack --workspace @feniix/pi-portable-tools`
+- `npm run prepack --workspace @feniix/bridgekit`
 - `npm run mcp:text-utils:package-smoke`
 
 ---
@@ -146,18 +146,18 @@ The SDK extraction has a good modern ESM/TypeScript foundation, but a few librar
 **Dependencies:** None
 
 **Files:**
-- Modify: `packages/pi-portable-tools/tsconfig.json`
-- Modify: `scripts/verify-pi-portable-tools-dist.mjs`
-- Test: `scripts/verify-pi-portable-tools-dist.mjs`
+- Modify: `packages/bridgekit/tsconfig.json`
+- Modify: `scripts/verify-bridgekit-dist.mjs`
+- Test: `scripts/verify-bridgekit-dist.mjs`
 
 **Approach:**
 - Add a verifier check that scans published SDK `.js` files under `dist/src` and fails if any contain `sourceMappingURL=`.
-- Disable source maps in `packages/pi-portable-tools/tsconfig.json` so a clean SDK build satisfies the verifier.
+- Disable source maps in `packages/bridgekit/tsconfig.json` so a clean SDK build satisfies the verifier.
 
 **Execution note:** Test-first. Make the verifier catch the current dangling map references before changing the package tsconfig.
 
 **Patterns to follow:**
-- Existing dist verification in `scripts/verify-pi-portable-tools-dist.mjs`
+- Existing dist verification in `scripts/verify-bridgekit-dist.mjs`
 - `scripts/clean-package-dist.mjs` clean-build behavior
 
 **Test scenarios:**
@@ -166,8 +166,8 @@ The SDK extraction has a good modern ESM/TypeScript foundation, but a few librar
 - Packed tarball still excludes test and typecheck artifacts.
 
 **Verification:**
-- `npm run prepack --workspace @feniix/pi-portable-tools`
-- `npm pack --workspace @feniix/pi-portable-tools --dry-run --json`
+- `npm run prepack --workspace @feniix/bridgekit`
+- `npm pack --workspace @feniix/bridgekit --dry-run --json`
 
 ---
 
@@ -180,12 +180,12 @@ The SDK extraction has a good modern ESM/TypeScript foundation, but a few librar
 **Dependencies:** None
 
 **Files:**
-- Modify: `packages/pi-portable-tools/src/core/define-tool.ts`
-- Modify: `packages/pi-portable-tools/src/core/execute-tool.ts`
-- Modify: `packages/pi-portable-tools/src/core/execute-tool.test.ts`
-- Modify: `packages/pi-portable-tools/src/index.ts`
+- Modify: `packages/bridgekit/src/core/define-tool.ts`
+- Modify: `packages/bridgekit/src/core/execute-tool.ts`
+- Modify: `packages/bridgekit/src/core/execute-tool.test.ts`
+- Modify: `packages/bridgekit/src/index.ts`
 - Modify: `scripts/smoke-pi-text-utils-package.mjs`
-- Test: `packages/pi-portable-tools/src/core/execute-tool.test.ts`
+- Test: `packages/bridgekit/src/core/execute-tool.test.ts`
 - Test: installed SDK declaration compile fixture inside `scripts/smoke-pi-text-utils-package.mjs`
 
 **Approach:**
@@ -196,7 +196,7 @@ The SDK extraction has a good modern ESM/TypeScript foundation, but a few librar
 **Execution note:** Types-first and test-first. Add type-level assertions/imports before implementation passes.
 
 **Patterns to follow:**
-- Existing TypeBox-inferred arg test in `packages/pi-portable-tools/src/core/execute-tool.test.ts`
+- Existing TypeBox-inferred arg test in `packages/bridgekit/src/core/execute-tool.test.ts`
 - Installed SDK declaration fixture in `scripts/smoke-pi-text-utils-package.mjs`
 
 **Test scenarios:**
@@ -239,8 +239,8 @@ The SDK extraction has a good modern ESM/TypeScript foundation, but a few librar
 
 - `npm run typecheck`
 - `npm test`
-- `npm run prepack --workspace @feniix/pi-portable-tools`
-- `npm pack --workspace @feniix/pi-portable-tools --dry-run --json`
+- `npm run prepack --workspace @feniix/bridgekit`
+- `npm pack --workspace @feniix/bridgekit --dry-run --json`
 - `npm run mcp:text-utils:package-smoke`
 
 ---
@@ -250,4 +250,4 @@ The SDK extraction has a good modern ESM/TypeScript foundation, but a few librar
 - No npm publish occurs in this branch.
 - Consumers should see no runtime behavior change.
 - Consumers can start using `PortableToolHost` for custom adapter typing after release.
-- Review feedback resolution: bump `@feniix/pi-portable-tools` to `0.2.0` and update the `pi-text-utils` dependency to match so the Node `>=20` contract tightening and type-surface additions are semver-visible before any future publish.
+- Review feedback resolution: bump `@feniix/bridgekit` to `0.2.0` and update the `pi-text-utils` dependency to match so the Node `>=20` contract tightening and type-surface additions are semver-visible before any future publish.

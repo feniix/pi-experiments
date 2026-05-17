@@ -5,7 +5,7 @@ Tiny fixture package proving one portable tool definition can be exposed as both
 - a native pi extension tool set; and
 - an MCP stdio server tool set.
 
-`pi-text-utils` now consumes `@feniix/pi-portable-tools`; tool logic stays here while the reusable portable-tool contract and host adapters live in the SDK package.
+`pi-text-utils` now consumes `@feniix/bridgekit`; tool logic stays here while the reusable portable-tool contract and host adapters live in the SDK package.
 
 ## Tools
 
@@ -24,7 +24,7 @@ The packaged pi entrypoint is:
 }
 ```
 
-The source extension remains at `extensions/index.ts` for local development and calls `registerPiTools` from `@feniix/pi-portable-tools/pi`.
+The source extension remains at `extensions/index.ts` for local development and calls `registerPiTools` from `@feniix/bridgekit/pi`.
 
 Build, then run locally with pi from this repo root:
 
@@ -48,7 +48,7 @@ Or use the root npm wrapper:
 npm run mcp:text-utils:server
 ```
 
-The server uses `runMcpStdioServer` from `@feniix/pi-portable-tools/mcp`.
+The server uses `runMcpStdioServer` from `@feniix/bridgekit/mcp`.
 
 ## pi prompt tests
 
@@ -91,12 +91,12 @@ npm run mcp:text-utils:parity
 
 ## Error behavior
 
-As of `0.3.0`, reusable adapters live in `@feniix/pi-portable-tools`. Portable validation failures are host-native errors in pi: the pi adapter rejects with `PortableToolExecutionError`. MCP returns the equivalent tool result with `isError: true`. The parity script normalizes both paths to verify they remain behaviorally equivalent.
+As of `0.3.0`, reusable adapters live in `@feniix/bridgekit`. Portable validation failures are host-native errors in pi: the pi adapter rejects with `PortableToolExecutionError`. MCP returns the equivalent tool result with `isError: true`. The parity script normalizes both paths to verify they remain behaviorally equivalent.
 
 ## Migration note
 
-The previous text-utils-local deep import `dist/src/adapters/mcp.js` exposed an experimental `registerMcpTools` helper. That helper was removed because it claimed high-level MCP SDK compatibility that was not exercised by production code. Use `@feniix/pi-portable-tools/mcp` and its `createMcpServer` or `runMcpStdioServer` APIs instead.
+The previous text-utils-local deep import `dist/src/adapters/mcp.js` exposed an experimental `registerMcpTools` helper. That helper was removed because it claimed high-level MCP SDK compatibility that was not exercised by production code. Use `@feniix/bridgekit/mcp` and its `createMcpServer` or `runMcpStdioServer` APIs instead.
 
 ## Local tarballs and release ordering
 
-`@feniix/pi-text-utils` has a normal semver dependency on `@feniix/pi-portable-tools` and bundles the SDK package in its tarball so local unpublished text-utils tarballs install cleanly on their own. `npm run mcp:text-utils:package-smoke` verifies both the single-tarball path and the explicit SDK + text-utils tarball path. For an npm release, publish `@feniix/pi-portable-tools@0.2.0` before publishing `@feniix/pi-text-utils@0.3.1` so registry installs do not rely on the bundled fallback indefinitely.
+`@feniix/pi-text-utils` has a normal semver dependency on `@feniix/bridgekit` and bundles the SDK package in its tarball so local unpublished text-utils tarballs install cleanly on their own. `npm run mcp:text-utils:package-smoke` verifies both the single-tarball path and the explicit SDK + text-utils tarball path. For an npm release, publish `@feniix/bridgekit@0.2.0` before publishing `@feniix/pi-text-utils@0.3.1` so registry installs do not rely on the bundled fallback indefinitely.

@@ -3,7 +3,7 @@ import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
-import { executePortableTool, type PortableTool } from "@feniix/pi-portable-tools";
+import { executePortableTool, type PortableTool } from "@feniix/bridgekit";
 import type { TObject } from "typebox";
 import { ThoughtStorage } from "./storage.js";
 import { createSequentialThinkingTools } from "./tools.js";

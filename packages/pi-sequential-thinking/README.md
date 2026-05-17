@@ -1,6 +1,6 @@
 # @feniix/pi-sequential-thinking
 
-Sequential Thinking tools for [pi](https://pi.dev/) and MCP. This package ports the behavior of `@feniix/pi-sequential-thinking` from `../pi-extensions` into this repo's `@feniix/pi-portable-tools` experiment so the same tool definitions can run as both a native pi extension and an MCP stdio server.
+Sequential Thinking tools for [pi](https://pi.dev/) and MCP. This package ports the behavior of `@feniix/pi-sequential-thinking` from `../pi-extensions` into this repo's `@feniix/bridgekit` experiment so the same tool definitions can run as both a native pi extension and an MCP stdio server.
 
 > Experimental incubation package. It is intended for this repo's short-lived pi/MCP portability experiments and is not published by this branch.
 

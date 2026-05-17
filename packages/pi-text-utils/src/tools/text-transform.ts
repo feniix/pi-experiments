@@ -1,4 +1,4 @@
-import { definePortableTool } from "@feniix/pi-portable-tools";
+import { definePortableTool } from "@feniix/bridgekit";
 import { type Static, Type } from "typebox";
 
 export const textTransformParams = Type.Object({

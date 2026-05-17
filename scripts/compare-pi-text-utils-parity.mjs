@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { existsSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { isPortableToolExecutionError, registerPiTools } from "@feniix/pi-portable-tools/pi";
+import { isPortableToolExecutionError, registerPiTools } from "@feniix/bridgekit/pi";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { textUtilsTools } from "../packages/pi-text-utils/dist/src/tools/index.js";

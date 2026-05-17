@@ -64,9 +64,9 @@ function textFromContent(content) {
 async function assertSdkRuntimeExports(installDir) {
   const code = `
     import assert from "node:assert/strict";
-    import * as core from "@feniix/pi-portable-tools";
-    import * as pi from "@feniix/pi-portable-tools/pi";
-    import * as mcp from "@feniix/pi-portable-tools/mcp";
+    import * as core from "@feniix/bridgekit";
+    import * as pi from "@feniix/bridgekit/pi";
+    import * as mcp from "@feniix/bridgekit/mcp";
     assert.deepEqual(Object.keys(core).sort(), ["definePortableTool", "executePortableTool", "validatePortableToolArgs"]);
     assert.deepEqual(Object.keys(pi).sort(), ["PortableToolExecutionError", "isPortableToolExecutionError", "registerPiTools"]);
     assert.deepEqual(Object.keys(mcp).sort(), ["createMcpServer", "runMcpStdioServer"]);
@@ -88,13 +88,13 @@ async function assertSdkTypesCompile(installDir) {
         type PortableToolContext,
         type PortableToolHost,
         type PortableToolResult,
-      } from "@feniix/pi-portable-tools";
+      } from "@feniix/bridgekit";
       import {
         isPortableToolExecutionError,
         PortableToolExecutionError,
         type PiToolRegistration,
-      } from "@feniix/pi-portable-tools/pi";
-      import { type CreateMcpServerOptions } from "@feniix/pi-portable-tools/mcp";
+      } from "@feniix/bridgekit/pi";
+      import { type CreateMcpServerOptions } from "@feniix/bridgekit/mcp";
 
       const params = Type.Object({ text: Type.String() });
       type Params = Static<typeof params>;
@@ -197,7 +197,7 @@ try {
   const sdkPack = await run("npm", [
     "pack",
     "--workspace",
-    "@feniix/pi-portable-tools",
+    "@feniix/bridgekit",
     "--pack-destination",
     packDir,
     "--json",
@@ -230,7 +230,7 @@ try {
     "pi-text-utils",
     "node_modules",
     "@feniix",
-    "pi-portable-tools",
+    "bridgekit",
   );
   assert.ok(
     existsSync(join(bundledSdkDir, "dist", "src", "mcp.js")),
@@ -274,7 +274,7 @@ try {
     cwd: installDir,
   });
 
-  const installedSdkDir = join(installDir, "node_modules", "@feniix", "pi-portable-tools");
+  const installedSdkDir = join(installDir, "node_modules", "@feniix", "bridgekit");
   const installedPackageDir = join(installDir, "node_modules", "@feniix", "pi-text-utils");
   const installedServer = join(installedPackageDir, "dist", "src", "mcp-server.js");
   const installedPiExtension = join(installedPackageDir, "dist", "extensions", "index.js");
@@ -296,7 +296,7 @@ try {
 
   const textUtilsPackage = await readJson(join(installedPackageDir, "package.json"));
   const sdkPackage = await readJson(join(installedSdkDir, "package.json"));
-  const sdkRange = textUtilsPackage.dependencies?.["@feniix/pi-portable-tools"];
+  const sdkRange = textUtilsPackage.dependencies?.["@feniix/bridgekit"];
   assert.equal(sdkRange, "0.2.0");
   assert.doesNotMatch(sdkRange, /^(workspace:|file:)/);
   assert.equal(sdkPackage.version, "0.2.0");

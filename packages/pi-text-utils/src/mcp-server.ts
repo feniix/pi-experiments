@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { runMcpStdioServer } from "@feniix/pi-portable-tools/mcp";
+import { runMcpStdioServer } from "@feniix/bridgekit/mcp";
 import { getTextUtilsPackageVersion } from "./package-metadata.js";
 import { textUtilsTools } from "./tools/index.js";
 

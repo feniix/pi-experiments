@@ -5,7 +5,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const packageRoot = join(repoRoot, "packages", "pi-portable-tools");
+const packageRoot = join(repoRoot, "packages", "bridgekit");
 const packageJson = JSON.parse(readFileSync(join(packageRoot, "package.json"), "utf8"));
 
 assert.equal(packageJson.main, "./dist/src/index.js", "package main must point at built root entrypoint");
@@ -50,7 +50,7 @@ for (const path of collectJavaScriptFiles(join(packageRoot, "dist", "src"))) {
   assert.doesNotMatch(contents, /sourceMappingURL=/, `${relativePath} must not reference unpublished source maps`);
 }
 
-console.error("✓ pi-portable-tools package metadata declares entrypoints, engines, side effects, and docs");
-console.error("✓ pi-portable-tools dist entrypoints are present");
-console.error("✓ pi-portable-tools public entries do not expose registerMcpTools");
-console.error("✓ pi-portable-tools dist JavaScript does not reference unpublished source maps");
+console.error("✓ bridgekit package metadata declares entrypoints, engines, side effects, and docs");
+console.error("✓ bridgekit dist entrypoints are present");
+console.error("✓ bridgekit public entries do not expose registerMcpTools");
+console.error("✓ bridgekit dist JavaScript does not reference unpublished source maps");

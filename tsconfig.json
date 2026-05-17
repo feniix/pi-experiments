@@ -2,7 +2,7 @@
   "extends": "./tsconfig.base.json",
   "files": [],
   "references": [
-    { "path": "./packages/pi-portable-tools" },
+    { "path": "./packages/bridgekit" },
     { "path": "./packages/pi-text-utils" },
     { "path": "./packages/pi-sequential-thinking" }
   ]

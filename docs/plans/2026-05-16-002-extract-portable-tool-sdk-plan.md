@@ -81,8 +81,8 @@ Extract the reusable portable-tool core and host adapters from `packages/pi-text
 
 ## Key Technical Decisions
 
-- Create `packages/pi-portable-tools` named `@feniix/pi-portable-tools`: this name matches the pi ecosystem while still describing host-neutral portable tools.
-- Export SDK entrypoints with subpaths: `@feniix/pi-portable-tools` for core, `@feniix/pi-portable-tools/pi` for pi adapter, and `@feniix/pi-portable-tools/mcp` for MCP adapter. These subpaths isolate runtime imports by entrypoint, not npm installation dependencies within the single package.
+- Create `packages/bridgekit` named `@feniix/bridgekit`: this brandable package name describes bridging host-neutral tools into pi, MCP, and future hosts.
+- Export SDK entrypoints with subpaths: `@feniix/bridgekit` for core, `@feniix/bridgekit/pi` for pi adapter, and `@feniix/bridgekit/mcp` for MCP adapter. These subpaths isolate runtime imports by entrypoint, not npm installation dependencies within the single package.
 - Remove the high-level `registerMcpTools` helper instead of renaming it: no production code uses it, and retaining it encourages unsupported high-level MCP assumptions.
 - Make the SDK MCP adapter accept server metadata from consumers: `pi-text-utils` should own its own server name/version/instructions rather than the SDK reading consumer package metadata implicitly.
 - Keep package version discovery local to `pi-text-utils`; the SDK server factory should not hardcode consumer identity or provide a generic metadata helper in this refactor.
@@ -106,7 +106,7 @@ Extract the reusable portable-tool core and host adapters from `packages/pi-text
 
 ## Output Structure
 
-    packages/pi-portable-tools/
+    packages/bridgekit/
       package.json
       README.md
       tsconfig.json
@@ -165,7 +165,7 @@ The SDK manifest should expose this package contract:
 
 ```json
 {
-  "name": "@feniix/pi-portable-tools",
+  "name": "@feniix/bridgekit",
   "version": "0.1.0",
   "type": "module",
   "exports": {
@@ -176,7 +176,7 @@ The SDK manifest should expose this package contract:
   },
   "scripts": {
     "build": "tsc -b tsconfig.json",
-    "prepack": "npm run build && node ../../scripts/verify-pi-portable-tools-dist.mjs"
+    "prepack": "npm run build && node ../../scripts/verify-bridgekit-dist.mjs"
   },
   "files": ["dist/**/*.js", "dist/**/*.d.ts", "!dist/**/*.test.*", "!dist/tsconfig.tsbuildinfo", "README.md"],
   "dependencies": {
@@ -188,7 +188,7 @@ The SDK manifest should expose this package contract:
 }
 ```
 
-`@feniix/pi-text-utils` should depend on `@feniix/pi-portable-tools` using a normal semver range satisfied by the local workspace version and packed SDK tarball, not `workspace:*` or `file:`. Its package build/prepack flow must build the SDK first from a clean state (for example with `tsc -b` project references or an explicit SDK build) rather than relying on stale SDK `dist` output.
+`@feniix/pi-text-utils` should depend on `@feniix/bridgekit` using a normal semver range satisfied by the local workspace version and packed SDK tarball, not `workspace:*` or `file:`. Its package build/prepack flow must build the SDK first from a clean state (for example with `tsc -b` project references or an explicit SDK build) rather than relying on stale SDK `dist` output.
 
 ---
 
@@ -196,25 +196,25 @@ The SDK manifest should expose this package contract:
 
 ### U1. Add SDK package scaffold and core portable contract
 
-**Goal:** Create `@feniix/pi-portable-tools` with the portable tool types, TypeBox validation, and execution helper moved behind a package export.
+**Goal:** Create `@feniix/bridgekit` with the portable tool types, TypeBox validation, and execution helper moved behind a package export.
 
 **Requirements:** R2, R4, R6
 
 **Dependencies:** None
 
 **Files:**
-- Create: `packages/pi-portable-tools/package.json`
-- Create: `packages/pi-portable-tools/tsconfig.json`
-- Create: `packages/pi-portable-tools/README.md`
-- Create: `packages/pi-portable-tools/src/index.ts`
-- Create: `packages/pi-portable-tools/src/core/define-tool.ts`
-- Create: `packages/pi-portable-tools/src/core/execute-tool.ts`
-- Create: `packages/pi-portable-tools/src/core/execute-tool.test.ts`
+- Create: `packages/bridgekit/package.json`
+- Create: `packages/bridgekit/tsconfig.json`
+- Create: `packages/bridgekit/README.md`
+- Create: `packages/bridgekit/src/index.ts`
+- Create: `packages/bridgekit/src/core/define-tool.ts`
+- Create: `packages/bridgekit/src/core/execute-tool.ts`
+- Create: `packages/bridgekit/src/core/execute-tool.test.ts`
 - Modify: `tsconfig.json`
 - Modify: `tsconfig.base.json`
 - Modify: `package.json`
 - Modify: `package-lock.json`
-- Create: `scripts/verify-pi-portable-tools-dist.mjs`
+- Create: `scripts/verify-bridgekit-dist.mjs`
 
 **Approach:**
 - Write the SDK package manifest and public core export shape before moving implementation.
@@ -232,7 +232,7 @@ The SDK manifest should expose this package contract:
 **Test scenarios:**
 - Happy path: valid args execute a portable tool and return its structured result.
 - Error path: invalid args return `isError: true` with `validationErrors` and do not call the tool handler.
-- Type/API path: importing `definePortableTool`, `executePortableTool`, and portable types from `@feniix/pi-portable-tools` compiles.
+- Type/API path: importing `definePortableTool`, `executePortableTool`, and portable types from `@feniix/bridgekit` compiles.
 - API contract path: root public symbols are snapshotted so no host adapter symbols leak from the root entrypoint.
 
 **Verification:**
@@ -251,11 +251,11 @@ The SDK manifest should expose this package contract:
 **Dependencies:** U1
 
 **Files:**
-- Create: `packages/pi-portable-tools/src/mcp.ts`
-- Create: `packages/pi-portable-tools/src/adapters/mcp.ts`
-- Create: `packages/pi-portable-tools/src/adapters/mcp.test.ts`
-- Create: `packages/pi-portable-tools/src/adapters/mcp.integration.test.ts`
-- Modify: `packages/pi-portable-tools/package.json`
+- Create: `packages/bridgekit/src/mcp.ts`
+- Create: `packages/bridgekit/src/adapters/mcp.ts`
+- Create: `packages/bridgekit/src/adapters/mcp.test.ts`
+- Create: `packages/bridgekit/src/adapters/mcp.integration.test.ts`
+- Modify: `packages/bridgekit/package.json`
 - Modify: `packages/pi-text-utils/src/mcp-server.ts` *(only after SDK MCP tests pass, if needed for compile wiring)*
 
 **Approach:**
@@ -263,7 +263,7 @@ The SDK manifest should expose this package contract:
 - Do not provide or test a fake high-level registration API.
 - Keep `pi-text-utils` rewiring and local adapter deletion primarily in U4; touch `pi-text-utils/src/mcp-server.ts` in this unit only if required to prove the SDK API compiles.
 
-**Execution note:** Test-first. The first MCP adapter test should fail because the SDK package does not yet expose `@feniix/pi-portable-tools/mcp`.
+**Execution note:** Test-first. The first MCP adapter test should fail because the SDK package does not yet expose `@feniix/bridgekit/mcp`.
 
 **Patterns to follow:**
 - `packages/pi-text-utils/src/adapters/mcp.ts`
@@ -295,14 +295,14 @@ The SDK manifest should expose this package contract:
 **Dependencies:** U1
 
 **Files:**
-- Create: `packages/pi-portable-tools/src/pi.ts`
-- Create: `packages/pi-portable-tools/src/adapters/pi.ts`
-- Create: `packages/pi-portable-tools/src/adapters/pi.test.ts`
-- Modify: `packages/pi-portable-tools/package.json`
+- Create: `packages/bridgekit/src/pi.ts`
+- Create: `packages/bridgekit/src/adapters/pi.ts`
+- Create: `packages/bridgekit/src/adapters/pi.test.ts`
+- Modify: `packages/bridgekit/package.json`
 
 **Approach:**
 - Write SDK pi adapter tests around registration metadata, successful execution, progress mapping, and portable validation error rejection.
-- Export `registerPiTools`, `PortableToolExecutionError`, and `isPortableToolExecutionError` from `@feniix/pi-portable-tools/pi`.
+- Export `registerPiTools`, `PortableToolExecutionError`, and `isPortableToolExecutionError` from `@feniix/bridgekit/pi`.
 - Keep `pi-text-utils` rewiring and local adapter deletion in U4 so U3 does not create temporary consumer churn.
 
 **Execution note:** Test-first. Add the SDK pi tests before moving the adapter implementation.
@@ -325,7 +325,7 @@ The SDK manifest should expose this package contract:
 
 ### U4. Convert pi-text-utils to an SDK consumer and remove duplicate local SDK code
 
-**Goal:** Make `@feniix/pi-text-utils` depend on `@feniix/pi-portable-tools`, remove local portable/adapter implementation duplication, and keep the package fixture working from packed tarballs.
+**Goal:** Make `@feniix/pi-text-utils` depend on `@feniix/bridgekit`, remove local portable/adapter implementation duplication, and keep the package fixture working from packed tarballs.
 
 **Requirements:** R3, R4, R5, R6
 
@@ -353,7 +353,7 @@ The SDK manifest should expose this package contract:
 
 **Approach:**
 - Update imports to package subpaths and keep text utility tests focused on domain behavior.
-- Bump `@feniix/pi-text-utils` to `0.3.0` because local deep-import adapter files and `registerMcpTools` are removed; document migration to `@feniix/pi-portable-tools/mcp`.
+- Bump `@feniix/pi-text-utils` to `0.3.0` because local deep-import adapter files and `registerMcpTools` are removed; document migration to `@feniix/bridgekit/mcp`.
 - Change `pi-text-utils` build/prepack so `npm pack --workspace @feniix/pi-text-utils` builds the SDK dependency first instead of relying on stale SDK dist.
 - Delete local portable and adapter implementation files from `pi-text-utils`; do not preserve compatibility re-exports unless a failing package entrypoint test proves one is required.
 - Update package smoke to pack SDK first, pack text-utils second, and install both tarballs together in a clean temp project with no workspace links.
@@ -373,11 +373,11 @@ The SDK manifest should expose this package contract:
 - Packaging: SDK tarball contains core, pi, and MCP subpath dist files but no test files.
 - Packaging: text-utils tarball no longer contains local SDK implementation tests or stale adapter implementation files.
 - Packaging: smoke fails if `pi-text-utils` uses `workspace:*`, `file:`, or a semver range not satisfied by the packed SDK version.
-- Type/API path: a temp NodeNext TypeScript consumer imports `@feniix/pi-portable-tools`, `@feniix/pi-portable-tools/pi`, and `@feniix/pi-portable-tools/mcp` from the packed SDK tarball; defines a TypeBox tool with inferred args; calls `executePortableTool`; constructs `CreateMcpServerOptions`; and narrows `PortableToolExecutionError` with `isPortableToolExecutionError` while accessing validation details.
+- Type/API path: a temp NodeNext TypeScript consumer imports `@feniix/bridgekit`, `@feniix/bridgekit/pi`, and `@feniix/bridgekit/mcp` from the packed SDK tarball; defines a TypeBox tool with inferred args; calls `executePortableTool`; constructs `CreateMcpServerOptions`; and narrows `PortableToolExecutionError` with `isPortableToolExecutionError` while accessing validation details.
 
 **Verification:**
 - `npm run mcp:text-utils:package-smoke` passes from clean temp install.
-- `npm pack --dry-run --workspace @feniix/pi-portable-tools` succeeds.
+- `npm pack --dry-run --workspace @feniix/bridgekit` succeeds.
 - `npm pack --dry-run --workspace @feniix/pi-text-utils` succeeds.
 - Grepping built and packed artifacts finds no `registerMcpTools` symbol.
 - API contract snapshot confirms only the intended SDK public symbols are exported from root, pi, and MCP runtime entrypoints.
@@ -411,8 +411,8 @@ The SDK manifest should expose this package contract:
 
 ## Documentation / Operational Notes
 
-- Update `packages/pi-text-utils/README.md` to explain it is now an example consumer of `@feniix/pi-portable-tools`.
-- Add a concise `packages/pi-portable-tools/README.md` with core, pi, and MCP usage snippets.
+- Update `packages/pi-text-utils/README.md` to explain it is now an example consumer of `@feniix/bridgekit`.
+- Add a concise `packages/bridgekit/README.md` with core, pi, and MCP usage snippets.
 - Keep the root scripts unchanged where possible so current verification commands remain valid.
 
 ---
