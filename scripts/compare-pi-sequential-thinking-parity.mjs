@@ -107,7 +107,15 @@ function normalizeComparableResult(result, context) {
 }
 
 function assertNormalizedEqual(label, left, leftContext, right, rightContext) {
-  assert.deepEqual(normalizeComparableResult(left, leftContext), normalizeComparableResult(right, rightContext), label);
+  const normalizedLeft = normalizeComparableResult(left, leftContext);
+  const normalizedRight = normalizeComparableResult(right, rightContext);
+  assert.deepEqual(normalizedLeft, normalizedRight, label);
+  return normalizedLeft;
+}
+
+function preview(value, maxLength = 360) {
+  const compact = JSON.stringify(value).replaceAll("\\n", " ");
+  return compact.length > maxLength ? `${compact.slice(0, maxLength - 3)}...` : compact;
 }
 
 function runNormalizationSelfChecks() {
@@ -311,9 +319,10 @@ async function assertCallParity(label, mcp, pi, name, argsForHost) {
   const mcpArgs = typeof argsForHost === "function" ? argsForHost(mcp) : argsForHost;
   const piArgs = typeof argsForHost === "function" ? argsForHost(pi) : argsForHost;
   const [mcpResult, piResult] = await Promise.all([mcp.callTool(name, mcpArgs), pi.callTool(name, piArgs)]);
-  assertNormalizedEqual(label, mcpResult, contextFor(mcp), piResult, contextFor(pi));
+  const normalized = assertNormalizedEqual(label, mcpResult, contextFor(mcp), piResult, contextFor(pi));
   console.log(`✓ ${label} matched`);
-  return { mcpResult, piResult };
+  console.log(`  MCP == pi: ${preview(normalized.textPayload)}`);
+  return { mcpResult, piResult, normalized };
 }
 
 function writeLegacyImportFile(host) {
@@ -359,8 +368,10 @@ async function runParityScenario(mcp, pi) {
     piTools.map((tool) => tool.name),
     TOOL_NAMES,
   );
-  assert.deepEqual(normalizeValue(mcpTools, { paths: [] }), normalizeValue(piTools, { paths: [] }));
+  const normalizedTools = normalizeValue(mcpTools, { paths: [] });
+  assert.deepEqual(normalizedTools, normalizeValue(piTools, { paths: [] }));
   console.log("✓ listed identical sequential-thinking tool metadata");
+  console.log(`  MCP == pi: ${mcpTools.map((tool) => tool.name).join(", ")}`);
 
   const initialStatus = await assertCallParity("initial get_thinking_status", mcp, pi, "get_thinking_status", {});
   assertEnvStatus("MCP initial status", initialStatus.mcpResult);
@@ -382,7 +393,7 @@ async function runParityScenario(mcp, pi) {
     file_path: host.exportPath,
     sessionId: "research",
   }));
-  assertNormalizedEqual(
+  const normalizedExport = assertNormalizedEqual(
     "exported JSON files must match",
     readExportedPayload(mcp),
     contextFor(mcp),
@@ -390,6 +401,7 @@ async function runParityScenario(mcp, pi) {
     contextFor(pi),
   );
   console.log("✓ exported JSON files matched");
+  console.log(`  MCP == pi: ${preview(normalizedExport.textPayload)}`);
 
   await assertCallParity("clear_history", mcp, pi, "clear_history", { sessionId: "research" });
 
