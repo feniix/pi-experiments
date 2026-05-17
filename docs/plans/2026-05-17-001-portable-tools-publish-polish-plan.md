@@ -250,3 +250,4 @@ The SDK extraction has a good modern ESM/TypeScript foundation, but a few librar
 - No npm publish occurs in this branch.
 - Consumers should see no runtime behavior change.
 - Consumers can start using `PortableToolHost` for custom adapter typing after release.
+- Review feedback resolution: bump `@feniix/pi-portable-tools` to `0.2.0` and update the `pi-text-utils` dependency to match so the Node `>=20` contract tightening and type-surface additions are semver-visible before any future publish.

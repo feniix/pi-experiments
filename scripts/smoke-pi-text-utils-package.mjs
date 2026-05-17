@@ -295,9 +295,9 @@ try {
   const textUtilsPackage = await readJson(join(installedPackageDir, "package.json"));
   const sdkPackage = await readJson(join(installedSdkDir, "package.json"));
   const sdkRange = textUtilsPackage.dependencies?.["@feniix/pi-portable-tools"];
-  assert.equal(sdkRange, "0.1.0");
+  assert.equal(sdkRange, "0.2.0");
   assert.doesNotMatch(sdkRange, /^(workspace:|file:)/);
-  assert.equal(sdkPackage.version, "0.1.0");
+  assert.equal(sdkPackage.version, "0.2.0");
 
   await assertSdkRuntimeExports(installDir);
   await assertSdkTypesCompile(installDir);
