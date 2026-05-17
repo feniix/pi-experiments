@@ -1,0 +1,54 @@
+{
+  "name": "@feniix/pi-sequential-thinking",
+  "version": "0.1.0",
+  "description": "Portable sequential thinking tools exposed as both a pi extension and an MCP server.",
+  "keywords": [
+    "pi",
+    "pi-package",
+    "pi-extension",
+    "mcp",
+    "portable-tools",
+    "sequential-thinking"
+  ],
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "bin": {
+    "pi-sequential-thinking-mcp": "./dist/src/mcp-server.js"
+  },
+  "scripts": {
+    "build": "npm run build --workspace @feniix/pi-portable-tools && node ../../scripts/clean-package-dist.mjs && tsc -b tsconfig.json",
+    "prepack": "npm run build && node ../../scripts/vendor-pi-portable-tools-for-pack.mjs pi-sequential-thinking && node ../../scripts/verify-pi-sequential-thinking-dist.mjs",
+    "postpack": "node ../../scripts/cleanup-pi-sequential-thinking-vendor.mjs"
+  },
+  "files": [
+    "dist/**/*.js",
+    "dist/**/*.d.ts",
+    "!dist/**/*.test.*",
+    "!dist/tsconfig.tsbuildinfo",
+    "README.md"
+  ],
+  "pi": {
+    "extensions": [
+      "./dist/extensions/index.js"
+    ]
+  },
+  "dependencies": {
+    "@feniix/pi-portable-tools": "0.2.0",
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "typebox": "^1.1.31"
+  },
+  "bundleDependencies": [
+    "@feniix/pi-portable-tools"
+  ],
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "*"
+  },
+  "peerDependenciesMeta": {
+    "@earendil-works/pi-coding-agent": {
+      "optional": true
+    }
+  },
+  "license": "MIT"
+}
