@@ -12,6 +12,13 @@ assert.equal(packageJson.main, "./dist/src/index.js", "package main must point a
 assert.equal(packageJson.types, "./dist/src/index.d.ts", "package types must point at built root declarations");
 assert.equal(packageJson.engines?.node, ">=20", "package must declare the supported Node runtime floor");
 assert.equal(packageJson.sideEffects, false, "package must declare published modules as side-effect free");
+assert.ok(packageJson.files?.includes("llms.txt"), "package files must include llms.txt");
+assert.ok(packageJson.files?.includes("examples/README.md"), "package files must include examples/README.md");
+
+const documentationEntries = ["README.md", "llms.txt", "examples/README.md"];
+for (const file of documentationEntries) {
+  assert.ok(existsSync(join(packageRoot, file)), `missing SDK documentation file: ${file}`);
+}
 
 const publicEntries = [
   "dist/src/index.js",
@@ -43,7 +50,7 @@ for (const path of collectJavaScriptFiles(join(packageRoot, "dist", "src"))) {
   assert.doesNotMatch(contents, /sourceMappingURL=/, `${relativePath} must not reference unpublished source maps`);
 }
 
-console.error("✓ pi-portable-tools package metadata declares entrypoints, engines, and side effects");
+console.error("✓ pi-portable-tools package metadata declares entrypoints, engines, side effects, and docs");
 console.error("✓ pi-portable-tools dist entrypoints are present");
 console.error("✓ pi-portable-tools public entries do not expose registerMcpTools");
 console.error("✓ pi-portable-tools dist JavaScript does not reference unpublished source maps");
