@@ -11,6 +11,9 @@
     "text-utils"
   ],
   "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
   "bin": {
     "pi-text-utils-mcp": "./dist/src/mcp-server.js"
   },

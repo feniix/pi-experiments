@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import assert from "node:assert/strict";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -8,6 +8,15 @@ const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const packageRoot = join(repoRoot, "packages", "pi-text-utils");
 
 const requiredEntrypoints = ["dist/src/mcp-server.js", "dist/extensions/index.js"];
+
+function collectJavaScriptFiles(dir) {
+  return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+    const path = join(dir, entry.name);
+    if (entry.isDirectory()) return collectJavaScriptFiles(path);
+    return entry.isFile() && entry.name.endsWith(".js") ? [path] : [];
+  });
+}
+
 for (const file of requiredEntrypoints) {
   assert.ok(existsSync(join(packageRoot, file)), `missing required pi-text-utils dist entrypoint: ${file}`);
 }
@@ -31,5 +40,12 @@ for (const file of requiredEntrypoints) {
   assert.doesNotMatch(contents, /registerMcpTools/, `${file} must not reference registerMcpTools`);
 }
 
+for (const path of collectJavaScriptFiles(join(packageRoot, "dist"))) {
+  const relativePath = path.slice(packageRoot.length + 1);
+  const contents = readFileSync(path, "utf8");
+  assert.doesNotMatch(contents, /sourceMappingURL=/, `${relativePath} must not reference unpublished source maps`);
+}
+
 console.error("✓ pi-text-utils dist entrypoints are present");
 console.error("✓ pi-text-utils dist does not contain stale local SDK artifacts");
+console.error("✓ pi-text-utils dist JavaScript does not reference unpublished source maps");
