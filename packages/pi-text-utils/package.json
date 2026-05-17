@@ -15,7 +15,7 @@
     "pi-text-utils-mcp": "./dist/src/mcp-server.js"
   },
   "scripts": {
-    "build": "npm run build --workspace @feniix/pi-portable-tools && rm -rf dist && tsc -b tsconfig.json",
+    "build": "npm run build --workspace @feniix/pi-portable-tools && node ../../scripts/clean-package-dist.mjs && tsc -b tsconfig.json",
     "prepack": "npm run build && node ../../scripts/verify-pi-text-utils-dist.mjs"
   },
   "files": [

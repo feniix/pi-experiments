@@ -7,9 +7,9 @@
     "packages/*"
   ],
   "scripts": {
-    "clean": "rm -rf packages/*/dist packages/*/tsconfig.tsbuildinfo",
+    "clean": "node scripts/clean-workspace-dist.mjs",
     "typecheck": "tsc -b tsconfig.json",
-    "test": "npm run build && node --test $(find packages -path '*/dist/**/*.test.js' -type f | sort)",
+    "test": "npm run build && node scripts/run-built-tests.mjs",
     "build": "npm run clean && tsc -b tsconfig.json",
     "mcp:text-utils:server": "npm run build && node packages/pi-text-utils/dist/src/mcp-server.js",
     "mcp:text-utils:smoke": "npm run build && node scripts/smoke-pi-text-utils-mcp.mjs",
