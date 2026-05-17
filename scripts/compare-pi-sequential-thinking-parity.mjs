@@ -35,7 +35,7 @@ const VOLATILE_KEYS = new Set([
 const MEASUREMENT_KEYS = new Set(["totalBytes", "outputBytes", "totalLines", "outputLines"]);
 
 /** @typedef {{ isError: boolean, textPayload: unknown, structuredPayload: unknown }} ComparableResult */
-/** @typedef {{ name: string, storageDir: string, exportPath: string, legacyPath: string, listTools: () => Promise<string[]>, callTool: (name: string, args?: Record<string, unknown>) => Promise<ComparableResult>, close: () => Promise<void> }} HostRunner */
+/** @typedef {{ name: string, storageDir: string, exportPath: string, legacyPath: string, listTools: () => Promise<Array<Record<string, unknown>>>, toolSchemasForLlm?: () => Promise<unknown>, callTool: (name: string, args?: Record<string, unknown>) => Promise<ComparableResult>, close: () => Promise<void> }} HostRunner */
 
 function withTimeout(promise, label, timeoutMs = DEFAULT_TIMEOUT_MS) {
   let timeout;
@@ -236,6 +236,13 @@ async function createMcpHost(tempRoot) {
     stderr += chunk.toString();
   });
   const client = new Client({ name: "pi-sequential-thinking-parity-mcp", version: "0.1.0" });
+  let listedTools;
+  async function toolSchemasForLlm() {
+    if (!listedTools) {
+      listedTools = (await withTimeout(client.listTools(), "MCP listTools")).tools;
+    }
+    return listedTools;
+  }
   try {
     await withTimeout(client.connect(transport), "MCP client connect");
   } catch (error) {
@@ -249,9 +256,10 @@ async function createMcpHost(tempRoot) {
     storageDir,
     exportPath: join(storageDir, "exported-session.json"),
     legacyPath: join(storageDir, "legacy.json"),
+    toolSchemasForLlm,
     async listTools() {
-      const list = await withTimeout(client.listTools(), "MCP listTools");
-      return list.tools.map((tool) => ({
+      const tools = await toolSchemasForLlm();
+      return tools.map((tool) => ({
         name: tool.name,
         title: tool.title,
         description: tool.description,
@@ -372,6 +380,10 @@ async function runParityScenario(mcp, pi) {
   assert.deepEqual(normalizedTools, normalizeValue(piTools, { paths: [] }));
   console.log("✓ listed identical sequential-thinking tool metadata");
   console.log(`  MCP == pi: ${mcpTools.map((tool) => tool.name).join(", ")}`);
+  if (mcp.toolSchemasForLlm) {
+    console.log("\nMCP tool schema as returned by tools/list (what the model/client sees):");
+    console.log(JSON.stringify(await mcp.toolSchemasForLlm(), null, 2));
+  }
 
   const initialStatus = await assertCallParity("initial get_thinking_status", mcp, pi, "get_thinking_status", {});
   assertEnvStatus("MCP initial status", initialStatus.mcpResult);
