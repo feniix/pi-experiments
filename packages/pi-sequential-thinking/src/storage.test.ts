@@ -1,10 +1,26 @@
 import assert from "node:assert/strict";
-import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  lstatSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, test } from "node:test";
 import { ThoughtStorage } from "./storage.js";
-import { MAX_IMPORT_BYTES, SCHEMA_VERSION, STATUS_ENUMERATION_SESSION_THRESHOLD, type ThoughtData, ThoughtStage } from "./types.js";
+import {
+  MAX_IMPORT_BYTES,
+  SCHEMA_VERSION,
+  STATUS_ENUMERATION_SESSION_THRESHOLD,
+  type ThoughtData,
+  ThoughtStage,
+} from "./types.js";
 
 function createThought(overrides: Partial<ThoughtData> = {}): ThoughtData {
   return {
@@ -37,8 +53,14 @@ test("persists and isolates default and named sessions", () => {
   storage.addThought(createThought({ thought: "Default" }));
   storage.addThought(createThought({ id: "named-id", thought: "Named" }), "architecture-review");
 
-  assert.deepEqual(storage.getAllThoughts().map((thought) => thought.thought), ["Default"]);
-  assert.deepEqual(storage.getAllThoughts("architecture-review").map((thought) => thought.thought), ["Named"]);
+  assert.deepEqual(
+    storage.getAllThoughts().map((thought) => thought.thought),
+    ["Default"],
+  );
+  assert.deepEqual(
+    storage.getAllThoughts("architecture-review").map((thought) => thought.thought),
+    ["Named"],
+  );
   assert.equal(existsSync(join(tempDir, "current_session.json")), true);
   assert.equal(existsSync(join(tempDir, "sessions", "architecture-review.json")), true);
 });
@@ -176,7 +198,10 @@ test("guards import/export targets, oversized files, and corrupt active files", 
     writeFileSync(sessionFile, "not valid json {{{{json", "utf-8");
     const corruptStorage = new ThoughtStorage(corruptDir);
     assert.deepEqual(corruptStorage.getAllThoughts(), []);
-    assert.equal(corruptStorage.getStatus().backupFiles.some((file) => file.startsWith("current_session.json.bak.")), true);
+    assert.equal(
+      corruptStorage.getStatus().backupFiles.some((file) => file.startsWith("current_session.json.bak.")),
+      true,
+    );
   } finally {
     rmSync(corruptDir, { recursive: true, force: true });
   }
@@ -203,3 +228,23 @@ if (process.platform !== "win32") {
     assert.equal(statSync(storageDir).mode & 0o077, 0);
   });
 }
+
+test("reports corrupt named sessions as incomplete without backing them up", () => {
+  const sessionsDir = join(tempDir, "sessions");
+  mkdirSync(sessionsDir, { recursive: true });
+  const corruptSessionFile = join(sessionsDir, "corrupt.json");
+  writeFileSync(corruptSessionFile, "not valid json {{{{json", "utf-8");
+  const storage = new ThoughtStorage(tempDir);
+  storage.addThought(createThought({ thought: "Default" }));
+
+  const status = storage.getStatus();
+  assert.equal(existsSync(corruptSessionFile), true);
+  assert.equal(status.totalThoughts, undefined);
+  assert.equal(status.statusCompleteness.complete, false);
+  assert.match(status.statusCompleteness.reason ?? "", /corrupt/i);
+  assert.equal(
+    status.backupFiles.some((file) => file.includes("corrupt.json.bak.")),
+    false,
+  );
+  assert.ok(status.sessions.some((session) => session.sessionId === "corrupt" && session.corrupt === true));
+});

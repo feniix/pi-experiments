@@ -1,13 +1,7 @@
 import assert from "node:assert/strict";
 import { existsSync, unlinkSync } from "node:fs";
 import test from "node:test";
-import {
-  formatToolOutput,
-  resolveEffectiveLimits,
-  splitParams,
-  toJsonString,
-  writeTempFile,
-} from "./output.js";
+import { formatToolOutput, resolveEffectiveLimits, splitParams, toJsonString, writeTempFile } from "./output.js";
 
 test("stringifies output values", () => {
   assert.equal(toJsonString("hello"), "hello");

@@ -68,10 +68,7 @@ function truncateByBytes(text: string, maxBytes: number): string {
   return output;
 }
 
-export function truncateHead(
-  text: string,
-  limits: { maxLines?: number; maxBytes?: number },
-): TruncationResult {
+export function truncateHead(text: string, limits: { maxLines?: number; maxBytes?: number }): TruncationResult {
   const maxLines = Math.max(1, Math.floor(limits.maxLines ?? DEFAULT_MAX_LINES));
   const maxBytes = Math.max(1, Math.floor(limits.maxBytes ?? DEFAULT_MAX_BYTES));
   const lines = text.split("\n");

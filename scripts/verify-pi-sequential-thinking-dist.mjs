@@ -33,6 +33,20 @@ for (const file of requiredEntrypoints) {
   assert.ok(existsSync(join(packageRoot, file)), `missing pi-sequential-thinking dist entrypoint: ${file}`);
 }
 
+const forbiddenEntrypoints = [
+  "dist/src/portable/define-tool.js",
+  "dist/src/portable/define-tool.d.ts",
+  "dist/src/portable/execute-tool.js",
+  "dist/src/portable/execute-tool.d.ts",
+  "dist/src/adapters/pi.js",
+  "dist/src/adapters/pi.d.ts",
+  "dist/src/adapters/mcp.js",
+  "dist/src/adapters/mcp.d.ts",
+];
+for (const file of forbiddenEntrypoints) {
+  assert.equal(existsSync(join(packageRoot, file)), false, `stale local SDK artifact must not be packed: ${file}`);
+}
+
 for (const path of collectJavaScriptFiles(join(packageRoot, "dist"))) {
   const relativePath = path.slice(packageRoot.length + 1);
   const contents = readFileSync(path, "utf8");
@@ -41,4 +55,5 @@ for (const path of collectJavaScriptFiles(join(packageRoot, "dist"))) {
 
 console.error("✓ pi-sequential-thinking package metadata declares entrypoints and docs");
 console.error("✓ pi-sequential-thinking dist entrypoints are present");
+console.error("✓ pi-sequential-thinking dist does not contain stale local SDK artifacts");
 console.error("✓ pi-sequential-thinking dist JavaScript does not reference unpublished source maps");

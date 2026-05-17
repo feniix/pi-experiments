@@ -34,7 +34,7 @@ export function getSequentialThinkingPackageVersion(startUrl = import.meta.url):
 
 export function createMcpSequentialThinkingTools(options: CreateMcpSequentialThinkingToolsOptions = {}) {
   const env = options.env ?? process.env;
-  const effectiveConfig = () => resolveEffectiveConfig({ env, config: loadConfigWithSources(undefined) });
+  const effectiveConfig = () => resolveEffectiveConfig({ env, config: loadConfigWithSources(undefined, { env }) });
   const initialConfig = effectiveConfig();
   const storage = new ThoughtStorage(initialConfig.storageDir);
 

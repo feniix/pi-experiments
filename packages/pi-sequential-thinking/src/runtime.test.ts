@@ -68,21 +68,28 @@ test("extension registers source-compatible tools, schemas, and flags", () => {
       "sequential_think",
     ],
   );
-  assert.deepEqual(
-    mockPi.registeredFlags,
-    [
-      "--seq-think-storage-dir",
-      "--seq-think-config-file",
-      "--seq-think-config",
-      "--seq-think-max-bytes",
-      "--seq-think-max-lines",
-    ],
-  );
+  assert.deepEqual(mockPi.registeredFlags, [
+    "--seq-think-storage-dir",
+    "--seq-think-config-file",
+    "--seq-think-config",
+    "--seq-think-max-bytes",
+    "--seq-think-max-lines",
+  ]);
 
-  const required = getTool(mockPi, "process_thought").parameters.required ?? [];
+  const processParams = getTool(mockPi, "process_thought").parameters;
+  const required = processParams.required ?? [];
+  assert.deepEqual(required, ["thought", "stage"]);
   assert.equal(required.includes("thought_number"), false);
   assert.equal(required.includes("total_thoughts"), false);
   assert.equal(required.includes("next_thought_needed"), false);
+
+  const importParams = getTool(mockPi, "import_session").parameters as {
+    properties?: { file_path?: { description?: string; type?: string } };
+    required?: string[];
+  };
+  assert.deepEqual(importParams.required, ["file_path"]);
+  assert.equal(importParams.properties?.file_path?.description, "Path to the JSON file to import.");
+  assert.equal(importParams.properties?.file_path?.type, "string");
 });
 
 test("pi runtime preserves named sessions, receipts, history, import/export, and sequential_think", async () => {
@@ -118,7 +125,10 @@ test("pi runtime preserves named sessions, receipts, history, import/export, and
     undefined,
   );
   assert.equal(processResult.isError, false);
-  assert.deepEqual(updates[0], { content: [{ type: "text", text: "Processing thought..." }], details: { status: "pending" } });
+  assert.deepEqual(updates[0], {
+    content: [{ type: "text", text: "Processing thought..." }],
+    details: { status: "pending" },
+  });
   assert.equal(parseToolJson(processResult).receipt.totalThoughtsAdjusted.to, 5);
 
   await processTool.execute(
@@ -159,11 +169,22 @@ test("pi runtime preserves named sessions, receipts, history, import/export, and
     ]),
     "utf-8",
   );
-  assert.equal(parseToolJson(await importTool.execute("call-6", { file_path: legacyPath, sessionId: "legacy-import" })).receipt.postCount, 1);
-  assert.equal(parseToolJson(await historyTool.execute("call-7", { sessionId: "legacy-import" })).thoughts[0].thoughtNumber, 4);
+  assert.equal(
+    parseToolJson(await importTool.execute("call-6", { file_path: legacyPath, sessionId: "legacy-import" })).receipt
+      .postCount,
+    1,
+  );
+  assert.equal(
+    parseToolJson(await historyTool.execute("call-7", { sessionId: "legacy-import" })).thoughts[0].thoughtNumber,
+    4,
+  );
 
   const sequential = parseToolJson(
-    await sequentialTool.execute("call-8", { topic: "Database migration strategy", num_thoughts: 5, sessionId: "scratch" }),
+    await sequentialTool.execute("call-8", {
+      topic: "Database migration strategy",
+      num_thoughts: 5,
+      sessionId: "scratch",
+    }),
   );
   assert.equal(sequential.receipt.postCount, 5);
 
@@ -205,7 +226,10 @@ test("pi runtime returns structured validation errors", async () => {
     { field: "session_id", message: "Conflicting aliases for session_id" },
   ]);
 
-  const conflictingHistory = await historyTool.execute("call-13", { include_full_thoughts: true, includeFullThoughts: false });
+  const conflictingHistory = await historyTool.execute("call-13", {
+    include_full_thoughts: true,
+    includeFullThoughts: false,
+  });
   assert.equal(conflictingHistory.isError, true);
   assert.deepEqual(conflictingHistory.details.validationErrors, [
     { field: "include_full_thoughts", message: "Conflicting aliases for include_full_thoughts" },

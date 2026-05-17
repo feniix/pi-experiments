@@ -1,8 +1,15 @@
 import { join } from "node:path";
 import { definePortableTool, type PortableTool, type PortableToolResult } from "@feniix/pi-portable-tools";
-import { Type, type TObject } from "typebox";
+import { type TObject, Type } from "typebox";
 import { ThoughtAnalyzer } from "./analyzer.js";
-import { getHomeDir, loadConfigWithSources, normalizeNumber, normalizeString, resolveEffectiveConfig } from "./config.js";
+import {
+  getHomeDir,
+  loadConfigWithSources,
+  normalizeNumber,
+  normalizeString,
+  resolveEffectiveConfig,
+} from "./config.js";
+import { formatToolOutput, resolveEffectiveLimits, type SequentialThinkingToolDetails, splitParams } from "./output.js";
 import {
   type EffectiveConfigStatus,
   type ExportSessionResult,
@@ -11,12 +18,7 @@ import {
   ThoughtStorage,
 } from "./storage.js";
 import {
-  formatToolOutput,
-  resolveEffectiveLimits,
-  type SequentialThinkingToolDetails,
-  splitParams,
-} from "./output.js";
-import {
+  DEFAULT_HISTORY_LIMIT,
   generateUuid,
   normalizeSessionId,
   normalizeThoughtInput,
@@ -24,8 +26,6 @@ import {
   ThoughtStage,
   ThoughtValidationError,
   type ValidationError,
-  DEFAULT_HISTORY_LIMIT,
-  MAX_HISTORY_LIMIT,
 } from "./types.js";
 
 export interface CreateSequentialThinkingToolsOptions {
@@ -39,59 +39,107 @@ type SequentialThinkingPortableTool = PortableTool<TObject>;
 
 type ToolImplementation = (args: Record<string, unknown>) => unknown;
 
-const anyField = (description: string) => Type.Optional(Type.Any({ description }));
-
 const sessionParams = {
-  session_id: anyField("Session to use. Omit for the default session."),
-  sessionId: anyField("camelCase alias for session_id."),
+  session_id: Type.Optional(Type.String({ description: "Session to use. Omit for the default session." })),
+  sessionId: Type.Optional(Type.String({ description: "camelCase alias for session_id." })),
 };
 
 const outputLimitParams = {
-  piMaxBytes: anyField("Client-side max bytes override (clamped by config)."),
-  piMaxLines: anyField("Client-side max lines override (clamped by config)."),
+  piMaxBytes: Type.Optional(Type.Integer({ description: "Client-side max bytes override (clamped by config)." })),
+  piMaxLines: Type.Optional(Type.Integer({ description: "Client-side max lines override (clamped by config)." })),
 };
+
+const stringArray = (description: string) => Type.Array(Type.String(), { description });
 
 export const processThoughtParams = Type.Object(
   {
-    thought: anyField("The content of your thought."),
-    thought_number: anyField("Position in your sequence. Required at runtime — supply this field or thoughtNumber."),
-    thoughtNumber: anyField("camelCase alias for thought_number. Required at runtime — supply either form."),
-    total_thoughts: anyField("Expected total thoughts in the sequence. Required at runtime — supply this field or totalThoughts."),
-    totalThoughts: anyField("camelCase alias for total_thoughts. Required at runtime — supply either form."),
-    next_thought_needed: anyField("Whether more thoughts are needed after this one."),
-    nextThoughtNeeded: anyField("camelCase alias for next_thought_needed. Required at runtime — supply either form."),
-    stage: anyField("The thinking stage."),
-    tags: anyField("Keywords or categories for your thought."),
-    axioms_used: anyField("Principles or axioms applied in your thought."),
-    axiomsUsed: anyField("camelCase alias for axioms_used."),
-    assumptions_challenged: anyField("Assumptions your thought questions or challenges."),
-    assumptionsChallenged: anyField("camelCase alias for assumptions_challenged."),
+    thought: Type.String({ description: "The content of your thought." }),
+    thought_number: Type.Optional(
+      Type.Integer({
+        minimum: 1,
+        description:
+          "Position in your sequence. Required at runtime — supply this field or its camelCase alias thoughtNumber.",
+      }),
+    ),
+    thoughtNumber: Type.Optional(
+      Type.Integer({
+        minimum: 1,
+        description: "camelCase alias for thought_number. Required at runtime — supply either form.",
+      }),
+    ),
+    total_thoughts: Type.Optional(
+      Type.Integer({
+        minimum: 1,
+        description:
+          "Expected total thoughts in the sequence. Required at runtime — supply this field or its camelCase alias totalThoughts.",
+      }),
+    ),
+    totalThoughts: Type.Optional(
+      Type.Integer({
+        minimum: 1,
+        description: "camelCase alias for total_thoughts. Required at runtime — supply either form.",
+      }),
+    ),
+    next_thought_needed: Type.Optional(
+      Type.Boolean({
+        description:
+          "Whether more thoughts are needed after this one. Required at runtime — supply this field or its camelCase alias nextThoughtNeeded.",
+      }),
+    ),
+    nextThoughtNeeded: Type.Optional(
+      Type.Boolean({
+        description: "camelCase alias for next_thought_needed. Required at runtime — supply either form.",
+      }),
+    ),
+    stage: Type.String({
+      description:
+        "The thinking stage. Runtime normalization accepts the source stages case-insensitively: Problem Definition, Research, Analysis, Synthesis, Conclusion.",
+    }),
+    tags: Type.Optional(stringArray("Keywords or categories for your thought.")),
+    axioms_used: Type.Optional(stringArray("Principles or axioms applied in your thought.")),
+    axiomsUsed: Type.Optional(stringArray("camelCase alias for axioms_used.")),
+    assumptions_challenged: Type.Optional(stringArray("Assumptions your thought questions or challenges.")),
+    assumptionsChallenged: Type.Optional(stringArray("camelCase alias for assumptions_challenged.")),
     ...sessionParams,
     ...outputLimitParams,
   },
   { additionalProperties: true },
 );
 
-export const sessionScopedParams = Type.Object({ ...sessionParams, ...outputLimitParams }, { additionalProperties: true });
+export const sessionScopedParams = Type.Object(
+  { ...sessionParams, ...outputLimitParams },
+  { additionalProperties: true },
+);
 export const clearHistoryParams = sessionScopedParams;
 export const exportSessionParams = Type.Object(
   {
-    file_path: anyField("Path to save the exported session JSON file."),
+    file_path: Type.String({ description: "Path to save the exported session JSON file." }),
     ...sessionParams,
     ...outputLimitParams,
   },
   { additionalProperties: true },
 );
-export const importSessionParams = exportSessionParams;
+export const importSessionParams = Type.Object(
+  {
+    file_path: Type.String({ description: "Path to the JSON file to import." }),
+    ...sessionParams,
+    ...outputLimitParams,
+  },
+  { additionalProperties: true },
+);
 export const getThinkingHistoryParams = Type.Object(
   {
     ...sessionParams,
-    limit: anyField("Maximum thoughts to return."),
-    offset: anyField("Number of thoughts to skip from the start."),
-    include_full_thoughts: anyField(
-      "Whether to include full thought text. Default true; pass false to receive 120-char snippets.",
+    limit: Type.Optional(Type.Integer({ minimum: 1, maximum: 100, description: "Maximum thoughts to return." })),
+    offset: Type.Optional(Type.Integer({ minimum: 0, description: "Number of thoughts to skip from the start." })),
+    include_full_thoughts: Type.Optional(
+      Type.Boolean({
+        description: "Whether to include full thought text. Default true; pass false to receive 120-char snippets.",
+      }),
     ),
-    includeFullThoughts: anyField("camelCase alias for include_full_thoughts. Default true."),
+    includeFullThoughts: Type.Optional(
+      Type.Boolean({ description: "camelCase alias for include_full_thoughts. Default true." }),
+    ),
     ...outputLimitParams,
   },
   { additionalProperties: true },
@@ -99,8 +147,10 @@ export const getThinkingHistoryParams = Type.Object(
 export const getThinkingStatusParams = Type.Object({ ...outputLimitParams }, { additionalProperties: true });
 export const sequentialThinkParams = Type.Object(
   {
-    topic: anyField("The topic or question to think through."),
-    num_thoughts: anyField("Number of thoughts to generate (default: 5)."),
+    topic: Type.String({ description: "The topic or question to think through." }),
+    num_thoughts: Type.Optional(
+      Type.Integer({ minimum: 3, maximum: 10, description: "Number of thoughts to generate (default: 5)." }),
+    ),
     ...sessionParams,
     ...outputLimitParams,
   },
@@ -221,11 +271,14 @@ export function createSequentialThinkingTools(
   const config = resolveEffectiveConfig({ config: loadConfigWithSources(undefined) });
   const storage = options.storage ?? new ThoughtStorage(config.storageDir);
   const analyzer = options.analyzer ?? new ThoughtAnalyzer();
-  const getMaxLimits = options.getMaxLimits ?? (() => {
-    const effective = resolveEffectiveConfig({ config: loadConfigWithSources(undefined) });
-    return { maxBytes: effective.maxBytes, maxLines: effective.maxLines };
-  });
-  const getEffectiveConfig = options.getEffectiveConfig ?? (() => resolveEffectiveConfig({ config: loadConfigWithSources(undefined) }));
+  const getMaxLimits =
+    options.getMaxLimits ??
+    (() => {
+      const effective = resolveEffectiveConfig({ config: loadConfigWithSources(undefined) });
+      return { maxBytes: effective.maxBytes, maxLines: effective.maxLines };
+    });
+  const getEffectiveConfig =
+    options.getEffectiveConfig ?? (() => resolveEffectiveConfig({ config: loadConfigWithSources(undefined) }));
 
   function effectiveConfigForStatus(): EffectiveConfigStatus {
     const effective = getEffectiveConfig();
@@ -401,7 +454,13 @@ export function createSequentialThinkingTools(
       sessionScopedParams,
       generateSummary,
     ),
-    tool("clear_history", "Clear Thought History", "Reset one thinking session by clearing recorded thoughts.", clearHistoryParams, clearHistory),
+    tool(
+      "clear_history",
+      "Clear Thought History",
+      "Reset one thinking session by clearing recorded thoughts.",
+      clearHistoryParams,
+      clearHistory,
+    ),
     tool(
       "export_session",
       "Export Thinking Session",
@@ -439,4 +498,3 @@ export function createSequentialThinkingTools(
     ),
   ] as const;
 }
-

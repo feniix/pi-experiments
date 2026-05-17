@@ -108,9 +108,15 @@ try {
     "--json",
   ]);
   const sequentialTarballPath = parsePackOutput(sequentialPack.stdout, packDir);
-  assert.ok(existsSync(sequentialTarballPath), `expected sequential-thinking tarball to exist: ${sequentialTarballPath}`);
+  assert.ok(
+    existsSync(sequentialTarballPath),
+    `expected sequential-thinking tarball to exist: ${sequentialTarballPath}`,
+  );
 
-  await writeFile(join(installSequentialOnlyDir, "package.json"), JSON.stringify({ type: "module", private: true }, null, 2));
+  await writeFile(
+    join(installSequentialOnlyDir, "package.json"),
+    JSON.stringify({ type: "module", private: true }, null, 2),
+  );
   await run("npm", ["install", "--omit=dev", "--ignore-scripts", sequentialTarballPath], {
     cwd: installSequentialOnlyDir,
   });
@@ -149,7 +155,10 @@ try {
   try {
     await withTimeout(standaloneClient.connect(standaloneTransport), "standalone MCP client connect");
     const standaloneList = await withTimeout(standaloneClient.listTools(), "standalone MCP listTools");
-    assert.deepEqual(standaloneList.tools.map((tool) => tool.name), expectedToolNames);
+    assert.deepEqual(
+      standaloneList.tools.map((tool) => tool.name),
+      expectedToolNames,
+    );
     const standaloneResult = await withTimeout(
       standaloneClient.callTool({
         name: "process_thought",
@@ -211,7 +220,10 @@ try {
       registeredTools.push(tool);
     },
   });
-  assert.deepEqual(registeredTools.map((tool) => tool.name), expectedToolNames);
+  assert.deepEqual(
+    registeredTools.map((tool) => tool.name),
+    expectedToolNames,
+  );
   const processTool = registeredTools.find((tool) => tool.name === "process_thought");
   const historyTool = registeredTools.find((tool) => tool.name === "get_thinking_history");
   const statusTool = registeredTools.find((tool) => tool.name === "get_thinking_status");
@@ -227,7 +239,12 @@ try {
   assert.equal(piProcess.isError, false);
   assert.equal(parseToolText(piProcess.content[0].text).receipt.operation, "process_thought");
   assert.equal(parseToolText((await historyTool.execute("call-2", {})).content[0].text).totalThoughts, 1);
-  assert.equal(JSON.stringify(parseToolText((await statusTool.execute("call-3", {})).content[0].text)).includes("Installed pi smoke"), false);
+  assert.equal(
+    JSON.stringify(parseToolText((await statusTool.execute("call-3", {})).content[0].text)).includes(
+      "Installed pi smoke",
+    ),
+    false,
+  );
   const piInvalid = await processTool.execute("call-4", {
     thought: "   ",
     thought_number: 1,
@@ -253,7 +270,10 @@ try {
   await withTimeout(client.connect(transport), "MCP client connect");
 
   const list = await withTimeout(client.listTools(), "MCP listTools");
-  assert.deepEqual(list.tools.map((tool) => tool.name), expectedToolNames);
+  assert.deepEqual(
+    list.tools.map((tool) => tool.name),
+    expectedToolNames,
+  );
 
   const result = await withTimeout(
     client.callTool({

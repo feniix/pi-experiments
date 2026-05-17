@@ -28,10 +28,18 @@ export interface ResolveEffectiveConfigInput {
   };
   env?: Record<string, string | undefined>;
   config?: SeqThinkConfigWithSources | null;
+  cwd?: string;
+  homeDir?: string;
 }
 
-export function getHomeDir(): string {
-  return process.env.HOME || homedir();
+export interface ConfigLoadContext {
+  env?: Record<string, string | undefined>;
+  cwd?: string;
+  homeDir?: string;
+}
+
+export function getHomeDir(env: Record<string, string | undefined> = process.env): string {
+  return env.HOME || homedir();
 }
 
 export function normalizeString(value: unknown): string | undefined {
@@ -55,18 +63,21 @@ export function normalizeNumber(value: unknown): number | undefined {
   return undefined;
 }
 
-export function resolveConfigPath(configPath: string): string {
+export function resolveConfigPath(configPath: string, context: ConfigLoadContext = {}): string {
+  const env = context.env ?? process.env;
+  const cwd = context.cwd ?? process.cwd();
+  const homeDir = context.homeDir ?? getHomeDir(env);
   const trimmed = configPath.trim();
   if (trimmed.startsWith("~/")) {
-    return join(getHomeDir(), trimmed.slice(2));
+    return join(homeDir, trimmed.slice(2));
   }
   if (trimmed.startsWith("~")) {
-    return join(getHomeDir(), trimmed.slice(1));
+    return join(homeDir, trimmed.slice(1));
   }
   if (isAbsolute(trimmed)) {
     return trimmed;
   }
-  return resolve(process.cwd(), trimmed);
+  return resolve(cwd, trimmed);
 }
 
 export function parseConfig(raw: unknown, pathHint: string): SeqThinkConfig {
@@ -110,10 +121,13 @@ function loadSettingsConfig(
   }
 }
 
-function warnIgnoredLegacyConfigFiles(): void {
+function warnIgnoredLegacyConfigFiles(context: ConfigLoadContext = {}): void {
+  const env = context.env ?? process.env;
+  const cwd = context.cwd ?? process.cwd();
+  const homeDir = context.homeDir ?? getHomeDir(env);
   const legacyPaths = [
-    join(process.cwd(), ".pi", "extensions", "sequential-thinking.json"),
-    join(getHomeDir(), ".pi", "agent", "extensions", "sequential-thinking.json"),
+    join(cwd, ".pi", "extensions", "sequential-thinking.json"),
+    join(homeDir, ".pi", "agent", "extensions", "sequential-thinking.json"),
   ];
 
   for (const legacyPath of legacyPaths) {
@@ -160,24 +174,30 @@ function mergeConfigWithSources(
   };
 }
 
-export function loadConfigWithSources(configPath: string | undefined): SeqThinkConfigWithSources | null {
-  const envConfigFile = process.env.SEQ_THINK_CONFIG_FILE;
-  const legacyEnvConfig = process.env.SEQ_THINK_CONFIG;
+export function loadConfigWithSources(
+  configPath: string | undefined,
+  context: ConfigLoadContext = {},
+): SeqThinkConfigWithSources | null {
+  const env = context.env ?? process.env;
+  const cwd = context.cwd ?? process.cwd();
+  const homeDir = context.homeDir ?? getHomeDir(env);
+  const envConfigFile = env.SEQ_THINK_CONFIG_FILE;
+  const legacyEnvConfig = env.SEQ_THINK_CONFIG;
   if (configPath) {
-    return loadConfigFileWithSources(resolveConfigPath(configPath));
+    return loadConfigFileWithSources(resolveConfigPath(configPath, { env, cwd, homeDir }));
   }
   if (envConfigFile) {
-    return loadConfigFileWithSources(resolveConfigPath(envConfigFile));
+    return loadConfigFileWithSources(resolveConfigPath(envConfigFile, { env, cwd, homeDir }));
   }
   if (legacyEnvConfig) {
     console.warn("[pi-sequential-thinking] SEQ_THINK_CONFIG is deprecated; use SEQ_THINK_CONFIG_FILE.");
-    return loadConfigFileWithSources(resolveConfigPath(legacyEnvConfig));
+    return loadConfigFileWithSources(resolveConfigPath(legacyEnvConfig, { env, cwd, homeDir }));
   }
 
-  warnIgnoredLegacyConfigFiles();
+  warnIgnoredLegacyConfigFiles({ env, cwd, homeDir });
 
-  const projectSettingsPath = join(process.cwd(), ".pi", "settings.json");
-  const globalSettingsPath = join(getHomeDir(), ".pi", "agent", "settings.json");
+  const projectSettingsPath = join(cwd, ".pi", "settings.json");
+  const globalSettingsPath = join(homeDir, ".pi", "agent", "settings.json");
 
   const globalConfig = loadSettingsConfig(globalSettingsPath, "global_settings");
   const projectConfig = loadSettingsConfig(projectSettingsPath, "project_settings");
@@ -193,6 +213,7 @@ export function resolveEffectiveConfig(input: ResolveEffectiveConfigInput = {}):
   const flags = input.flags ?? {};
   const env = input.env ?? process.env;
   const config = input.config;
+  const pathContext = { env, cwd: input.cwd, homeDir: input.homeDir };
 
   const flagStorageDir = normalizeString(flags.storageDir);
   const envStorageDir = normalizeString(env.MCP_STORAGE_DIR);
@@ -209,7 +230,7 @@ export function resolveEffectiveConfig(input: ResolveEffectiveConfigInput = {}):
   const storageDir = flagStorageDir ?? envStorageDir ?? configStorageDir;
 
   return {
-    storageDir: storageDir ? resolveConfigPath(storageDir) : undefined,
+    storageDir: storageDir ? resolveConfigPath(storageDir, pathContext) : undefined,
     maxBytes: flagMaxBytes ?? envMaxBytes ?? configMaxBytes ?? DEFAULT_MAX_BYTES,
     maxLines: flagMaxLines ?? envMaxLines ?? configMaxLines ?? DEFAULT_MAX_LINES,
     sources: {

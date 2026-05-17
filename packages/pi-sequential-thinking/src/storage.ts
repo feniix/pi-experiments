@@ -851,7 +851,7 @@ export class ThoughtStorage {
 
     try {
       renameSync(filePath, backupPath);
-      console.log(`[pi-sequential-thinking] Backed up corrupted file to ${this.redactPath(backupPath).value}`);
+      console.warn(`[pi-sequential-thinking] Backed up corrupted file to ${this.redactPath(backupPath).value}`);
     } catch {
       console.warn(`[pi-sequential-thinking] Could not backup corrupted file ${this.redactPath(filePath).value}`);
     }

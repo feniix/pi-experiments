@@ -1,7 +1,7 @@
 ---
 title: Add Portable Sequential Thinking Package
 type: feat
-status: active
+status: completed
 date: 2026-05-17
 ---
 

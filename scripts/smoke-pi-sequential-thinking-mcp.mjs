@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import assert from "node:assert/strict";
-import { existsSync, mkdtempSync } from "node:fs";
+import { existsSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -10,6 +10,7 @@ import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js"
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const serverPath = join(repoRoot, "packages/pi-sequential-thinking/dist/src/mcp-server.js");
 const storageDir = mkdtempSync(join(tmpdir(), "pi-seq-mcp-smoke-"));
+writeFileSync(join(storageDir, "current_session.json"), "not valid json {{{{json", "utf-8");
 const DEFAULT_TIMEOUT_MS = 30_000;
 
 function withTimeout(promise, label, timeoutMs = DEFAULT_TIMEOUT_MS) {

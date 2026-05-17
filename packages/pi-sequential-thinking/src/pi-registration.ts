@@ -1,6 +1,6 @@
-import type { TSchema } from "typebox";
 import type { PortableTool, PortableToolResult } from "@feniix/pi-portable-tools";
 import { executePortableTool } from "@feniix/pi-portable-tools";
+import type { TSchema } from "typebox";
 
 export type PiContent = { type: "text"; text: string };
 export type PiToolUpdate = { content: PiContent[]; details: Record<string, unknown> };
@@ -47,7 +47,10 @@ function toPiResult(result: PortableToolResult): PiToolResult {
   };
 }
 
-export function registerSequentialThinkingPiTools(pi: PiToolRegistration, tools: readonly PortableTool<TSchema>[]): void {
+export function registerSequentialThinkingPiTools(
+  pi: PiToolRegistration,
+  tools: readonly PortableTool<TSchema>[],
+): void {
   for (const tool of tools) {
     pi.registerTool({
       name: tool.name,

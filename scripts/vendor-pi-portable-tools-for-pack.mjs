@@ -19,12 +19,17 @@ assert.ok(existsSync(join(sdkRoot, "dist", "src", "mcp.js")), "missing built MCP
 
 await rm(vendorRoot, { recursive: true, force: true });
 await mkdir(vendorRoot, { recursive: true });
-await Promise.all([
+const copyTasks = [
   cp(join(sdkRoot, "package.json"), join(vendorRoot, "package.json")),
   cp(join(sdkRoot, "README.md"), join(vendorRoot, "README.md")),
-  cp(join(sdkRoot, "llms.txt"), join(vendorRoot, "llms.txt")),
-  cp(join(sdkRoot, "examples"), join(vendorRoot, "examples"), { recursive: true }),
   cp(join(sdkRoot, "dist"), join(vendorRoot, "dist"), { recursive: true }),
-]);
+];
+if (targetPackage !== "pi-text-utils") {
+  copyTasks.push(
+    cp(join(sdkRoot, "llms.txt"), join(vendorRoot, "llms.txt")),
+    cp(join(sdkRoot, "examples"), join(vendorRoot, "examples"), { recursive: true }),
+  );
+}
+await Promise.all(copyTasks);
 
 console.error(`✓ vendored @feniix/pi-portable-tools for ${targetPackage} packing`);

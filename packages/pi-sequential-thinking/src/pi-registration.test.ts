@@ -3,8 +3,10 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
-import { ThoughtStorage } from "./storage.js";
+import { definePortableTool } from "@feniix/pi-portable-tools";
+import { Type } from "typebox";
 import { registerSequentialThinkingPiTools } from "./pi-registration.js";
+import { ThoughtStorage } from "./storage.js";
 import { createSequentialThinkingTools } from "./tools.js";
 
 interface RegisteredTool {
@@ -30,7 +32,11 @@ test("registerSequentialThinkingPiTools maps portable tools to source-compatible
   const registered: RegisteredTool[] = [];
 
   registerSequentialThinkingPiTools(
-    { registerTool(tool: RegisteredTool) { registered.push(tool); } },
+    {
+      registerTool(tool: RegisteredTool) {
+        registered.push(tool);
+      },
+    },
     tools,
   );
 
@@ -56,7 +62,9 @@ test("registerSequentialThinkingPiTools maps portable tools to source-compatible
     undefined,
   );
 
-  assert.deepEqual(updates, [{ content: [{ type: "text", text: "Processing thought..." }], details: { status: "pending" } }]);
+  assert.deepEqual(updates, [
+    { content: [{ type: "text", text: "Processing thought..." }], details: { status: "pending" } },
+  ]);
   assert.equal(result.isError, false);
   assert.equal(result.content[0].type, "text");
   assert.equal(result.details.tool, "process_thought");
@@ -79,4 +87,30 @@ test("registerSequentialThinkingPiTools maps portable tools to source-compatible
   assert.deepEqual(invalid.details.validationErrors, [
     { field: "thought", message: "Thought content cannot be empty" },
   ]);
+});
+
+test("registerSequentialThinkingPiTools returns source-compatible fallback errors for unexpected throws", async () => {
+  const throwingTool = definePortableTool({
+    name: "process_thought",
+    title: "Throwing Tool",
+    description: "Throws for pi wrapper fallback coverage.",
+    parameters: Type.Object({}, { additionalProperties: true }),
+    execute() {
+      throw new Error("unexpected boom");
+    },
+  });
+  const registered: RegisteredTool[] = [];
+  registerSequentialThinkingPiTools(
+    {
+      registerTool(tool: RegisteredTool) {
+        registered.push(tool);
+      },
+    },
+    [throwingTool],
+  );
+
+  const result = await registered[0].execute("call-throw", {});
+  assert.equal(result.isError, true);
+  assert.equal(result.content[0].text, "Sequential Thinking error: unexpected boom");
+  assert.deepEqual(result.details, { tool: "process_thought", truncated: false, error: "unexpected boom" });
 });

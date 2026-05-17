@@ -137,7 +137,9 @@ test("summary, history, clear, export, import, and sequential_think are session-
     ]),
     "utf-8",
   );
-  const importResult = parseJsonResult(await call("import_session", { file_path: legacyPath, sessionId: "legacy-import" }));
+  const importResult = parseJsonResult(
+    await call("import_session", { file_path: legacyPath, sessionId: "legacy-import" }),
+  );
   assert.equal(importResult.receipt.operation, "import_session");
   assert.equal(importResult.receipt.sessionId, "legacy-import");
 

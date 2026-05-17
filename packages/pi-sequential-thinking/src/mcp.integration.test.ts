@@ -17,7 +17,9 @@ function textFromContent(content: unknown): string {
 function parseResult(result: unknown) {
   assert.equal(typeof result, "object");
   assert.notEqual(result, null);
-  return JSON.parse(textFromContent((result as { content?: unknown }).content).replace(/\n\n\[Output truncated:[\s\S]*$/, ""));
+  return JSON.parse(
+    textFromContent((result as { content?: unknown }).content).replace(/\n\n\[Output truncated:[\s\S]*$/, ""),
+  );
 }
 
 test("MCP serves all sequential-thinking tools with source-compatible behavior", async () => {
@@ -62,7 +64,9 @@ test("MCP serves all sequential-thinking tools with source-compatible behavior",
     assert.equal(processResult.isError, false);
     assert.equal(parseResult(processResult).receipt.totalThoughtsAdjusted.to, 2);
 
-    const summary = parseResult(await client.callTool({ name: "generate_summary", arguments: { sessionId: "research" } }));
+    const summary = parseResult(
+      await client.callTool({ name: "generate_summary", arguments: { sessionId: "research" } }),
+    );
     assert.equal(summary.summary.totalThoughts, 1);
 
     const exportResult = parseResult(
@@ -91,12 +95,18 @@ test("MCP serves all sequential-thinking tools with source-compatible behavior",
       "utf-8",
     );
     const imported = parseResult(
-      await client.callTool({ name: "import_session", arguments: { file_path: legacyPath, sessionId: "legacy-import" } }),
+      await client.callTool({
+        name: "import_session",
+        arguments: { file_path: legacyPath, sessionId: "legacy-import" },
+      }),
     );
     assert.equal(imported.receipt.postCount, 1);
 
     const history = parseResult(
-      await client.callTool({ name: "get_thinking_history", arguments: { sessionId: "legacy-import", includeFullThoughts: false } }),
+      await client.callTool({
+        name: "get_thinking_history",
+        arguments: { sessionId: "legacy-import", includeFullThoughts: false },
+      }),
     );
     assert.equal(history.thoughts[0].thoughtNumber, 4);
     assert.equal(history.thoughts[0].thought, undefined);
@@ -123,6 +133,43 @@ test("MCP serves all sequential-thinking tools with source-compatible behavior",
     });
     assert.equal(invalid.isError, true);
     assert.match(textFromContent(invalid.content), /Thought content cannot be empty/);
+  } finally {
+    await client.close();
+    await server.close();
+  }
+});
+
+test("MCP startup honors source-compatible config file wiring", async () => {
+  const baseDir = mkdtempSync(join(tmpdir(), "pi-seq-mcp-config-"));
+  const configuredStorageDir = join(baseDir, "configured-storage");
+  const configPath = join(baseDir, "seq-config.json");
+  writeFileSync(
+    configPath,
+    JSON.stringify({ storageDir: configuredStorageDir, maxBytes: 1000, maxLines: 50 }),
+    "utf-8",
+  );
+  const tools = createMcpSequentialThinkingTools({ env: { SEQ_THINK_CONFIG_FILE: configPath } });
+  const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+  const server = createMcpServer({ name: "pi-sequential-thinking-config-test", version: "0.1.0", tools });
+  const client = new Client({ name: "pi-sequential-thinking-config-test-client", version: "0.1.0" });
+
+  await Promise.all([server.connect(serverTransport), client.connect(clientTransport)]);
+  try {
+    await client.callTool({
+      name: "process_thought",
+      arguments: {
+        thought: "Configured storage thought",
+        thought_number: 1,
+        total_thoughts: 1,
+        next_thought_needed: false,
+        stage: "Analysis",
+      },
+    });
+    const status = parseResult(await client.callTool({ name: "get_thinking_status", arguments: {} }));
+    assert.equal(status.effectiveConfig.sources.storageDir, "config_file");
+    assert.equal(status.effectiveConfig.sources.maxBytes, "config_file");
+    assert.equal(status.effectiveConfig.sources.maxLines, "config_file");
+    assert.equal(existsSync(join(configuredStorageDir, "current_session.json")), true);
   } finally {
     await client.close();
     await server.close();

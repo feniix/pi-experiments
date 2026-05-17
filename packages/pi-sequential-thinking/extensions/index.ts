@@ -1,5 +1,5 @@
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { join } from "node:path";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { getHomeDir, loadConfigWithSources, resolveEffectiveConfig } from "../src/config.js";
 import { registerSequentialThinkingPiTools } from "../src/pi-registration.js";
 import { ThoughtStorage } from "../src/storage.js";
