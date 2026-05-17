@@ -76,7 +76,7 @@ The SDK extraction has a good modern ESM/TypeScript foundation, but a few librar
 ## Key Technical Decisions
 
 - Keep the package ESM-only and Node-oriented; add `main` and `types` only as compatibility metadata, not as an alternate module format.
-- Add `"engines": { "node": ">=18" }` to match the installed MCP SDK’s documented runtime floor and the package’s `AbortSignal`/ESM assumptions. This SDK has not been published from this repo yet; before any future npm publish, treat the engine floor as release-note-worthy contract metadata and document it in the README so engine-strict consumers are not surprised.
+- Add `"engines": { "node": ">=20" }` to match the pi runtime baseline and this repo’s Node-based development scripts. This SDK has not been published from this repo yet; before any future npm publish, treat the engine floor as release-note-worthy contract metadata and document it in the README so engine-strict consumers are not surprised.
 - Add `"sideEffects": false` because the published modules are import-passive; behavior starts only when callers invoke exported functions.
 - Disable source-map emission at the SDK package level so the published JavaScript does not reference missing `.map` files.
 - Preserve the default closed first-party host union while adding generic extensibility: export `PortableToolBuiltInHost = "pi" | "mcp" | "test"`, `PortableToolHost<TExtension extends string = never> = PortableToolBuiltInHost | TExtension`, and thread the host generic through `PortableToolContext`, `PortableTool`, and `executePortableTool`. This is included now because the SDK is explicitly intended for userland portable adapters; without the generic, custom-adapter authors must either lie with `host: "test"` or cast through `never`.
@@ -126,7 +126,7 @@ The SDK extraction has a good modern ESM/TypeScript foundation, but a few librar
 **Test scenarios:**
 - Package metadata has `main` pointing at `./dist/src/index.js`.
 - Package metadata has `types` pointing at `./dist/src/index.d.ts`.
-- Package metadata has `engines.node` set to `>=18`.
+- Package metadata has `engines.node` set to `>=20`.
 - Package metadata has `sideEffects: false`.
 - Existing public subpath export checks still pass.
 - Public entrypoint files continue to assert that `registerMcpTools` is absent.

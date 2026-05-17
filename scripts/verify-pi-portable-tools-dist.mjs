@@ -10,7 +10,7 @@ const packageJson = JSON.parse(readFileSync(join(packageRoot, "package.json"), "
 
 assert.equal(packageJson.main, "./dist/src/index.js", "package main must point at built root entrypoint");
 assert.equal(packageJson.types, "./dist/src/index.d.ts", "package types must point at built root declarations");
-assert.equal(packageJson.engines?.node, ">=18", "package must declare the supported Node runtime floor");
+assert.equal(packageJson.engines?.node, ">=20", "package must declare the supported Node runtime floor");
 assert.equal(packageJson.sideEffects, false, "package must declare published modules as side-effect free");
 
 const publicEntries = [
