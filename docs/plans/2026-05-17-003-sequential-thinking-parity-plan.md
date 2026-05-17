@@ -1,7 +1,7 @@
 ---
 title: Sequential Thinking MCP/pi Parity Harness
 type: feature
-status: active
+status: completed
 date: 2026-05-17
 ---
 

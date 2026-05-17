@@ -21,6 +21,7 @@
     "mcp:text-utils:parity": "npm run build && node scripts/compare-pi-text-utils-parity.mjs",
     "mcp:text-utils:package-smoke": "npm run build && node scripts/smoke-pi-text-utils-package.mjs",
     "mcp:sequential-thinking:smoke": "npm run build && node scripts/smoke-pi-sequential-thinking-mcp.mjs",
+    "mcp:sequential-thinking:parity": "npm run build && node scripts/compare-pi-sequential-thinking-parity.mjs",
     "mcp:sequential-thinking:package-smoke": "npm run build && node scripts/smoke-pi-sequential-thinking-package.mjs"
   },
   "devDependencies": {
