@@ -7,9 +7,10 @@
     "packages/*"
   ],
   "scripts": {
+    "clean": "rm -rf packages/*/dist packages/*/tsconfig.tsbuildinfo",
     "typecheck": "tsc -b tsconfig.json --noEmit",
-    "test": "node --test packages/*/dist/**/*.test.js",
-    "build": "tsc -b tsconfig.json",
+    "test": "npm run build && node --test packages/*/dist/**/*.test.js",
+    "build": "npm run clean && tsc -b tsconfig.json",
     "mcp:text-utils:server": "npm run build && node packages/pi-text-utils/dist/src/mcp-server.js",
     "mcp:text-utils:smoke": "npm run build && node scripts/smoke-pi-text-utils-mcp.mjs",
     "mcp:text-utils:call": "npm run build && node scripts/call-pi-text-utils-mcp.mjs",

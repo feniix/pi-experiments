@@ -7,6 +7,12 @@
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
+    "baseUrl": ".",
+    "paths": {
+      "@feniix/pi-portable-tools": ["packages/pi-portable-tools/src/index.ts"],
+      "@feniix/pi-portable-tools/pi": ["packages/pi-portable-tools/src/pi.ts"],
+      "@feniix/pi-portable-tools/mcp": ["packages/pi-portable-tools/src/mcp.ts"]
+    },
     "declaration": true,
     "sourceMap": true
   }
