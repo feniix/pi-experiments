@@ -30,7 +30,9 @@ const testFiles = (
       .filter((entry) => entry.isDirectory())
       .map((entry) => collectTestFiles(join(packagesDir, entry.name, "dist"))),
   )
-).flat().sort();
+)
+  .flat()
+  .sort();
 
 if (testFiles.length === 0) {
   throw new Error("No built test files found under packages/*/dist. Run npm run build first.");

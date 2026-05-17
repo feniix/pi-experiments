@@ -2,11 +2,11 @@
 import assert from "node:assert/strict";
 import { execFile as execFileCallback } from "node:child_process";
 import { existsSync } from "node:fs";
-import { mkdir, mkdtemp, rm, readFile, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
-import { promisify } from "node:util";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { promisify } from "node:util";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 
@@ -216,7 +216,10 @@ try {
   const textUtilsTarballPath = parsePackOutput(textUtilsPack.stdout, packDir);
   assert.ok(existsSync(textUtilsTarballPath), `expected text-utils tarball to exist: ${textUtilsTarballPath}`);
 
-  await writeFile(join(installTextUtilsOnlyDir, "package.json"), JSON.stringify({ type: "module", private: true }, null, 2));
+  await writeFile(
+    join(installTextUtilsOnlyDir, "package.json"),
+    JSON.stringify({ type: "module", private: true }, null, 2),
+  );
   await run("npm", ["install", "--omit=dev", "--ignore-scripts", textUtilsTarballPath], {
     cwd: installTextUtilsOnlyDir,
   });
@@ -252,10 +255,7 @@ try {
   try {
     await withTimeout(standaloneClient.connect(standaloneTransport), "standalone MCP client connect");
     const standaloneList = await withTimeout(standaloneClient.listTools(), "standalone MCP listTools");
-    assert.deepEqual(
-      standaloneList.tools.map((tool) => tool.name).sort(),
-      ["text_stats", "text_transform"],
-    );
+    assert.deepEqual(standaloneList.tools.map((tool) => tool.name).sort(), ["text_stats", "text_transform"]);
     const standaloneResult = await withTimeout(
       standaloneClient.callTool({
         name: "text_transform",
@@ -327,10 +327,7 @@ try {
   await withTimeout(client.connect(transport), "MCP client connect");
 
   const list = await withTimeout(client.listTools(), "MCP listTools");
-  assert.deepEqual(
-    list.tools.map((tool) => tool.name).sort(),
-    ["text_stats", "text_transform"],
-  );
+  assert.deepEqual(list.tools.map((tool) => tool.name).sort(), ["text_stats", "text_transform"]);
 
   const result = await withTimeout(
     client.callTool({
@@ -369,7 +366,7 @@ try {
   console.log("✓ installed package includes and loads pi extension entrypoint");
 } catch (error) {
   if (stderr.trim()) {
-    console.error("\nInstalled server stderr:\n" + stderr.trim());
+    console.error(`\nInstalled server stderr:\n${stderr.trim()}`);
   }
   if (tempRoot) {
     console.error(`\nPackage smoke temp dir: ${tempRoot}`);

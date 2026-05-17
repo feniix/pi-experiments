@@ -50,7 +50,9 @@
     "@earendil-works/pi-coding-agent": "*"
   },
   "peerDependenciesMeta": {
-    "@earendil-works/pi-coding-agent": { "optional": true }
+    "@earendil-works/pi-coding-agent": {
+      "optional": true
+    }
   },
   "license": "MIT"
 }

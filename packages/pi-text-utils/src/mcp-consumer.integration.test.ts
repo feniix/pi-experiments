@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { createMcpServer } from "@feniix/pi-portable-tools/mcp";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
-import { createMcpServer } from "@feniix/pi-portable-tools/mcp";
 import { textUtilsTools } from "./tools/index.js";
 
 test("text-utils tools are served through the extracted MCP adapter", async () => {
@@ -19,10 +19,7 @@ test("text-utils tools are served through the extracted MCP adapter", async () =
 
   try {
     const list = await client.listTools();
-    assert.deepEqual(
-      list.tools.map((tool) => tool.name).sort(),
-      ["text_stats", "text_transform"],
-    );
+    assert.deepEqual(list.tools.map((tool) => tool.name).sort(), ["text_stats", "text_transform"]);
 
     const result = await client.callTool({
       name: "text_transform",

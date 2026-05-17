@@ -1,8 +1,5 @@
 {
   "extends": "./tsconfig.base.json",
   "files": [],
-  "references": [
-    { "path": "./packages/pi-portable-tools" },
-    { "path": "./packages/pi-text-utils" }
-  ]
+  "references": [{ "path": "./packages/pi-portable-tools" }, { "path": "./packages/pi-text-utils" }]
 }

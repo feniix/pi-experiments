@@ -4,10 +4,7 @@ import { textStatsTool } from "./text-stats.js";
 import { textTransformTool } from "./text-transform.js";
 
 test("text_transform uppercases text and returns structured content", async () => {
-  const result = await textTransformTool.execute(
-    { text: "Hello pi", operation: "uppercase" },
-    { host: "test" },
-  );
+  const result = await textTransformTool.execute({ text: "Hello pi", operation: "uppercase" }, { host: "test" });
 
   assert.equal(result.text, "HELLO PI");
   assert.deepEqual(result.structuredContent, {

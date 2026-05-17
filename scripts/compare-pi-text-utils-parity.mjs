@@ -3,12 +3,9 @@ import assert from "node:assert/strict";
 import { existsSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { isPortableToolExecutionError, registerPiTools } from "@feniix/pi-portable-tools/pi";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
-import {
-  isPortableToolExecutionError,
-  registerPiTools,
-} from "@feniix/pi-portable-tools/pi";
 import { textUtilsTools } from "../packages/pi-text-utils/dist/src/tools/index.js";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -137,7 +134,7 @@ try {
   console.log("\npi adapter and MCP stdio behavior match for valid and invalid portable-tool calls.");
 } catch (error) {
   if (stderr.trim()) {
-    console.error("\nServer stderr:\n" + stderr.trim());
+    console.error(`\nServer stderr:\n${stderr.trim()}`);
   }
   throw error;
 } finally {

@@ -25,8 +25,8 @@ function usage() {
   console.error("  npm run mcp:text-utils:call -- <tool-name> '<json-args>'");
   console.error("");
   console.error("Examples:");
-  console.error("  npm run mcp:text-utils:call -- text_transform '{\"text\":\"Hello MCP\",\"operation\":\"reverse\"}'");
-  console.error("  npm run mcp:text-utils:call -- text_stats '{\"text\":\"one two\\nthree\"}'");
+  console.error('  npm run mcp:text-utils:call -- text_transform \'{"text":"Hello MCP","operation":"reverse"}\'');
+  console.error('  npm run mcp:text-utils:call -- text_stats \'{"text":"one two\\nthree"}\'');
 }
 
 if (!toolName) {
@@ -72,14 +72,11 @@ try {
     throw new Error(`Unknown tool: ${toolName}`);
   }
 
-  const result = await withTimeout(
-    client.callTool({ name: toolName, arguments: parsedArgs }),
-    `MCP ${toolName} call`,
-  );
+  const result = await withTimeout(client.callTool({ name: toolName, arguments: parsedArgs }), `MCP ${toolName} call`);
   console.log(JSON.stringify(result, null, 2));
 } catch (error) {
   if (stderr.trim()) {
-    console.error("\nServer stderr:\n" + stderr.trim());
+    console.error(`\nServer stderr:\n${stderr.trim()}`);
   }
   throw error;
 } finally {

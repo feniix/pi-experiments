@@ -97,7 +97,7 @@ try {
   console.log("\nMCP smoke test passed.");
 } catch (error) {
   if (stderr.trim()) {
-    console.error("\nServer stderr:\n" + stderr.trim());
+    console.error(`\nServer stderr:\n${stderr.trim()}`);
   }
   throw error;
 } finally {
