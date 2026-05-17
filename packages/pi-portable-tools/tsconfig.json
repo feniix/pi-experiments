@@ -4,6 +4,5 @@
     "rootDir": ".",
     "outDir": "dist"
   },
-  "include": ["src/**/*.ts", "extensions/**/*.ts"],
-  "references": [{ "path": "../pi-portable-tools" }]
+  "include": ["src/**/*.ts"]
 }

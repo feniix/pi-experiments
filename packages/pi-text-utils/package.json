@@ -1,6 +1,6 @@
 {
   "name": "@feniix/pi-text-utils",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Tiny portable text utility tools exposed as both a pi extension and an MCP server.",
   "keywords": [
     "pi",
@@ -15,8 +15,9 @@
     "pi-text-utils-mcp": "./dist/src/mcp-server.js"
   },
   "scripts": {
-    "build": "tsc -p tsconfig.json",
-    "prepack": "npm run build && node ../../scripts/verify-pi-text-utils-dist.mjs"
+    "build": "npm run build --workspace @feniix/pi-portable-tools && node ../../scripts/clean-package-dist.mjs && tsc -b tsconfig.json",
+    "prepack": "npm run build && node ../../scripts/vendor-pi-portable-tools-for-pack.mjs && node ../../scripts/verify-pi-text-utils-dist.mjs",
+    "postpack": "node ../../scripts/cleanup-pi-text-utils-vendor.mjs"
   },
   "files": [
     "dist/**/*.js",
@@ -35,9 +36,13 @@
     ]
   },
   "dependencies": {
+    "@feniix/pi-portable-tools": "0.1.0",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "typebox": "^1.1.31"
   },
+  "bundleDependencies": [
+    "@feniix/pi-portable-tools"
+  ],
   "peerDependencies": {
     "@earendil-works/pi-coding-agent": "*"
   },

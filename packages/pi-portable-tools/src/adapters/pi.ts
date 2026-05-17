@@ -1,14 +1,32 @@
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import type { TSchema } from "typebox";
-import type { PortableTool, PortableToolResult } from "../portable/define-tool.js";
-import { executePortableTool } from "../portable/execute-tool.js";
-
-type PiToolRegistration = Pick<ExtensionAPI, "registerTool">;
+import type { PortableTool, PortableToolResult } from "../core/define-tool.js";
+import { executePortableTool } from "../core/execute-tool.js";
 
 type PiContent = { type: "text"; text: string };
 
+type PiToolUpdate = { content: PiContent[]; details: Record<string, unknown> };
+type PiToolResult = { content: PiContent[]; details: Record<string, unknown> };
+
+type PiToolDefinition = {
+  name: string;
+  label: string;
+  description: string;
+  parameters: TSchema;
+  execute(
+    toolCallId: string,
+    params: unknown,
+    signal?: AbortSignal,
+    onUpdate?: (update: PiToolUpdate) => void,
+    ctx?: unknown,
+  ): Promise<PiToolResult>;
+};
+
+export type PiToolRegistration = {
+  registerTool(tool: PiToolDefinition): unknown;
+};
+
 function toPiDetails(result: PortableToolResult): Record<string, unknown> {
-  return result.details ?? result.structuredContent ?? {};
+  return result.structuredContent ?? result.details ?? {};
 }
 
 export class PortableToolExecutionError extends Error {
