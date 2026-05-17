@@ -1,7 +1,7 @@
 ---
 title: Polish pi-portable-tools Publish Contract
 type: refactor
-status: active
+status: completed
 date: 2026-05-17
 ---
 
