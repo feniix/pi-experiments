@@ -9,7 +9,7 @@ test("text-utils tools are served through the extracted MCP adapter", async () =
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
   const server = createMcpServer({
     name: "pi-text-utils-test",
-    version: "0.3.0",
+    version: "0.3.1",
     tools: textUtilsTools,
     instructions: "Test text utils.",
   });
