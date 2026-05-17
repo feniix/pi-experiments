@@ -288,6 +288,8 @@ try {
   assert.ok(existsSync(join(installedSdkDir, "dist", "src", "index.js")), "missing installed SDK root entrypoint");
   assert.ok(existsSync(join(installedSdkDir, "dist", "src", "pi.js")), "missing installed SDK pi entrypoint");
   assert.ok(existsSync(join(installedSdkDir, "dist", "src", "mcp.js")), "missing installed SDK MCP entrypoint");
+  assert.ok(existsSync(join(installedSdkDir, "llms.txt")), "missing installed SDK llms.txt");
+  assert.ok(existsSync(join(installedSdkDir, "examples", "README.md")), "missing installed SDK examples README");
   assert.ok(existsSync(installedServer), `missing installed MCP server entrypoint: ${installedServer}`);
   assert.ok(existsSync(installedPiExtension), `missing installed pi extension entrypoint: ${installedPiExtension}`);
   assert.ok(existsSync(installedBin), `missing installed MCP bin shim: ${installedBin}`);
