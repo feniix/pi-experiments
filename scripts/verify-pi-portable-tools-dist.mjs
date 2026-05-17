@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import assert from "node:assert/strict";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -22,6 +22,14 @@ const publicEntries = [
   "dist/src/mcp.d.ts",
 ];
 
+function collectJavaScriptFiles(dir) {
+  return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+    const path = join(dir, entry.name);
+    if (entry.isDirectory()) return collectJavaScriptFiles(path);
+    return entry.isFile() && entry.name.endsWith(".js") ? [path] : [];
+  });
+}
+
 for (const file of publicEntries) {
   const path = join(packageRoot, file);
   assert.ok(existsSync(path), `missing SDK dist file: ${file}`);
@@ -29,6 +37,13 @@ for (const file of publicEntries) {
   assert.doesNotMatch(contents, /registerMcpTools/, `${file} must not export registerMcpTools`);
 }
 
+for (const path of collectJavaScriptFiles(join(packageRoot, "dist", "src"))) {
+  const relativePath = path.slice(packageRoot.length + 1);
+  const contents = readFileSync(path, "utf8");
+  assert.doesNotMatch(contents, /sourceMappingURL=/, `${relativePath} must not reference unpublished source maps`);
+}
+
 console.error("✓ pi-portable-tools package metadata declares entrypoints, engines, and side effects");
 console.error("✓ pi-portable-tools dist entrypoints are present");
 console.error("✓ pi-portable-tools public entries do not expose registerMcpTools");
+console.error("✓ pi-portable-tools dist JavaScript does not reference unpublished source maps");
