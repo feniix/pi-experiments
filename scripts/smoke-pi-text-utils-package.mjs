@@ -87,6 +87,7 @@ async function assertSdkTypesCompile(installDir) {
       import {
         isPortableToolExecutionError,
         PortableToolExecutionError,
+        type PiToolRegistration,
       } from "@feniix/pi-portable-tools/pi";
       import { type CreateMcpServerOptions } from "@feniix/pi-portable-tools/mcp";
 
@@ -108,7 +109,13 @@ async function assertSdkTypesCompile(installDir) {
         version: "0.1.0",
         tools: [tool],
       };
+      const piRegistration: PiToolRegistration = {
+        registerTool() {
+          return undefined;
+        },
+      };
       void options;
+      void piRegistration;
 
       async function run(): Promise<PortableToolResult> {
         return executePortableTool(tool, { text: "hello" }, { host: "test" });

@@ -96,3 +96,7 @@ As of `0.3.0`, reusable adapters live in `@feniix/pi-portable-tools`. Portable v
 ## Migration note
 
 The previous text-utils-local deep import `dist/src/adapters/mcp.js` exposed an experimental `registerMcpTools` helper. That helper was removed because it claimed high-level MCP SDK compatibility that was not exercised by production code. Use `@feniix/pi-portable-tools/mcp` and its `createMcpServer` or `runMcpStdioServer` APIs instead.
+
+## Local tarballs and release ordering
+
+`@feniix/pi-text-utils` has a normal semver dependency on `@feniix/pi-portable-tools`. When testing unpublished local tarballs, install the SDK tarball together with the text-utils tarball; `npm run mcp:text-utils:package-smoke` does this. For an npm release, publish `@feniix/pi-portable-tools@0.1.0` before publishing `@feniix/pi-text-utils@0.3.0`.
