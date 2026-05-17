@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { readFileSync } from "node:fs";
+import { readFileSync, realpathSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { runMcpStdioServer } from "@feniix/pi-portable-tools/mcp";
@@ -48,7 +48,16 @@ export function createMcpSequentialThinkingTools(options: CreateMcpSequentialThi
   });
 }
 
-if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
+function isDirectExecution(): boolean {
+  if (!process.argv[1]) return false;
+  try {
+    return realpathSync(fileURLToPath(import.meta.url)) === realpathSync(process.argv[1]);
+  } catch {
+    return fileURLToPath(import.meta.url) === process.argv[1];
+  }
+}
+
+if (isDirectExecution()) {
   try {
     await runMcpStdioServer({
       name: "pi-sequential-thinking",
