@@ -23,5 +23,5 @@ for (const file of publicEntries) {
   assert.doesNotMatch(contents, /registerMcpTools/, `${file} must not export registerMcpTools`);
 }
 
-console.log("✓ pi-portable-tools dist entrypoints are present");
-console.log("✓ pi-portable-tools public entries do not expose registerMcpTools");
+console.error("✓ pi-portable-tools dist entrypoints are present");
+console.error("✓ pi-portable-tools public entries do not expose registerMcpTools");

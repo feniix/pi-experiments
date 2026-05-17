@@ -16,7 +16,8 @@
   },
   "scripts": {
     "build": "npm run build --workspace @feniix/pi-portable-tools && node ../../scripts/clean-package-dist.mjs && tsc -b tsconfig.json",
-    "prepack": "npm run build && node ../../scripts/verify-pi-text-utils-dist.mjs"
+    "prepack": "npm run build && node ../../scripts/vendor-pi-portable-tools-for-pack.mjs && node ../../scripts/verify-pi-text-utils-dist.mjs",
+    "postpack": "node ../../scripts/cleanup-pi-text-utils-vendor.mjs"
   },
   "files": [
     "dist/**/*.js",
@@ -38,6 +39,9 @@
     "@feniix/pi-portable-tools": "0.1.0",
     "typebox": "^1.1.31"
   },
+  "bundleDependencies": [
+    "@feniix/pi-portable-tools"
+  ],
   "peerDependencies": {
     "@earendil-works/pi-coding-agent": "*"
   },

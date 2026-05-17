@@ -1,12 +1,17 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import test from "node:test";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { getTextUtilsPackageVersion } from "./package-metadata.js";
 
-test("getTextUtilsPackageVersion reads the package version from package metadata", () => {
-  assert.equal(getTextUtilsPackageVersion(), "0.3.0");
+const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
+
+test("getTextUtilsPackageVersion reads the package version from package metadata", async () => {
+  const pkg = JSON.parse(await readFile(join(packageRoot, "package.json"), "utf8")) as { version: string };
+
+  assert.equal(getTextUtilsPackageVersion(), pkg.version);
 });
 
 test("getTextUtilsPackageVersion returns a fallback when package metadata is unavailable", () => {

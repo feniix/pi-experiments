@@ -31,5 +31,5 @@ for (const file of requiredEntrypoints) {
   assert.doesNotMatch(contents, /registerMcpTools/, `${file} must not reference registerMcpTools`);
 }
 
-console.log("✓ pi-text-utils dist entrypoints are present");
-console.log("✓ pi-text-utils dist does not contain stale local SDK artifacts");
+console.error("✓ pi-text-utils dist entrypoints are present");
+console.error("✓ pi-text-utils dist does not contain stale local SDK artifacts");

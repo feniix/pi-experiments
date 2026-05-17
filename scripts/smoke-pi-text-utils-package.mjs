@@ -40,9 +40,7 @@ async function run(command, args, options = {}) {
 }
 
 function parsePackOutput(stdout, packDir) {
-  const jsonStart = stdout.indexOf("[\n");
-  const jsonText = jsonStart >= 0 ? stdout.slice(jsonStart) : stdout;
-  const parsed = JSON.parse(jsonText);
+  const parsed = JSON.parse(stdout);
   const entry = Array.isArray(parsed) ? parsed[0] : parsed;
   const filename = entry.filename ?? entry.name;
   assert.ok(filename, "npm pack JSON output must include filename");
@@ -163,8 +161,10 @@ try {
   tempRoot = await mkdtemp(join(tmpdir(), "pi-text-utils-package-smoke-"));
   const packDir = join(tempRoot, "pack");
   const installDir = join(tempRoot, "install");
+  const installTextUtilsOnlyDir = join(tempRoot, "install-text-utils-only");
   await mkdir(packDir, { recursive: true });
   await mkdir(installDir, { recursive: true });
+  await mkdir(installTextUtilsOnlyDir, { recursive: true });
 
   const sdkPack = await run("npm", [
     "pack",
@@ -187,6 +187,24 @@ try {
   ]);
   const textUtilsTarballPath = parsePackOutput(textUtilsPack.stdout, packDir);
   assert.ok(existsSync(textUtilsTarballPath), `expected text-utils tarball to exist: ${textUtilsTarballPath}`);
+
+  await writeFile(join(installTextUtilsOnlyDir, "package.json"), JSON.stringify({ type: "module", private: true }, null, 2));
+  await run("npm", ["install", "--omit=dev", "--ignore-scripts", textUtilsTarballPath], {
+    cwd: installTextUtilsOnlyDir,
+  });
+  const bundledSdkDir = join(
+    installTextUtilsOnlyDir,
+    "node_modules",
+    "@feniix",
+    "pi-text-utils",
+    "node_modules",
+    "@feniix",
+    "pi-portable-tools",
+  );
+  assert.ok(
+    existsSync(join(bundledSdkDir, "dist", "src", "mcp.js")),
+    "pi-text-utils tarball must install its bundled SDK dependency when installed alone",
+  );
 
   await writeFile(join(installDir, "package.json"), JSON.stringify({ type: "module", private: true }, null, 2));
   await run("npm", ["install", "--omit=dev", "--ignore-scripts", sdkTarballPath, textUtilsTarballPath], {
@@ -279,7 +297,8 @@ try {
   assert.deepEqual(invalid.structuredContent?.tool, "text_transform");
   assert.ok(Array.isArray(invalid.structuredContent?.validationErrors));
 
-  console.log("✓ packed SDK and text-utils packages install into a clean temp project");
+  console.log("✓ packed text-utils package installs alone with bundled SDK dependency");
+  console.log("✓ packed SDK and text-utils packages install together into a clean temp project");
   console.log("✓ installed SDK runtime and declaration subpath exports work");
   console.log("✓ installed MCP bin lists and serves text_transform from declared dependencies");
   console.log("✓ installed package includes and loads pi extension entrypoint");
