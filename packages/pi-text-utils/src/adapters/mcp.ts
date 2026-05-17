@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import {
@@ -15,6 +18,27 @@ type McpToolRegistration = {
 };
 
 type McpContent = { type: "text"; text: string };
+
+export function getPackageVersion(startUrl = import.meta.url): string {
+  let currentDir = dirname(fileURLToPath(startUrl));
+
+  for (let depth = 0; depth < 6; depth += 1) {
+    const packagePath = join(currentDir, "package.json");
+    try {
+      const pkg = JSON.parse(readFileSync(packagePath, "utf8")) as { name?: string; version?: string };
+      if (pkg.name === "@feniix/pi-text-utils" && typeof pkg.version === "string") {
+        return pkg.version;
+      }
+    } catch {
+      // Keep walking up until we find the package root.
+    }
+    const parent = dirname(currentDir);
+    if (parent === currentDir) break;
+    currentDir = parent;
+  }
+
+  return "0.0.0";
+}
 
 function toMcpResult(result: PortableToolResult): CallToolResult {
   return {
@@ -55,7 +79,7 @@ export function registerMcpTools(server: McpToolRegistration, tools: readonly Po
 export function createMcpServer(tools: readonly PortableTool<TSchema>[]): Server {
   const byName = new Map(tools.map((tool) => [tool.name, tool]));
   const server = new Server(
-    { name: "pi-text-utils", version: "0.1.0" },
+    { name: "pi-text-utils", version: getPackageVersion() },
     {
       capabilities: { tools: { listChanged: false } },
       instructions:

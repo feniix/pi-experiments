@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { textUtilsTools } from "../tools/index.js";
-import { createMcpServer, registerMcpTools } from "./mcp.js";
+import { createMcpServer, getPackageVersion, registerMcpTools } from "./mcp.js";
 
 test("registerMcpTools registers every portable tool with MCP metadata", () => {
   const registered: Array<{ name: string; config: Record<string, unknown>; callback: Function }> = [];
@@ -60,4 +60,8 @@ test("createMcpServer returns a connectable MCP server", () => {
   const server = createMcpServer(textUtilsTools);
 
   assert.equal(typeof server.connect, "function");
+});
+
+test("getPackageVersion reads the package version from package metadata", () => {
+  assert.equal(getPackageVersion(), "0.2.0");
 });
