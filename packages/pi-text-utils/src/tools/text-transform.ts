@@ -1,5 +1,5 @@
+import { definePortableTool } from "@feniix/pi-portable-tools";
 import { Type, type Static } from "typebox";
-import { definePortableTool } from "../portable/define-tool.js";
 
 export const textTransformParams = Type.Object({
   text: Type.String({ description: "Text to transform." }),

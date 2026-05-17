@@ -2,12 +2,17 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
-import { createMcpServer } from "./mcp.js";
-import { textUtilsTools } from "../tools/index.js";
+import { createMcpServer } from "@feniix/pi-portable-tools/mcp";
+import { textUtilsTools } from "./tools/index.js";
 
-test("MCP server lists and calls portable tools over a transport", async () => {
+test("text-utils tools are served through the extracted MCP adapter", async () => {
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
-  const server = createMcpServer(textUtilsTools);
+  const server = createMcpServer({
+    name: "pi-text-utils-test",
+    version: "0.3.0",
+    tools: textUtilsTools,
+    instructions: "Test text utils.",
+  });
   const client = new Client({ name: "pi-text-utils-test", version: "0.1.0" });
 
   await Promise.all([server.connect(serverTransport), client.connect(clientTransport)]);
@@ -23,7 +28,6 @@ test("MCP server lists and calls portable tools over a transport", async () => {
       name: "text_transform",
       arguments: { text: "Hello MCP", operation: "slugify" },
     });
-
     assert.deepEqual(result.content, [{ type: "text", text: "hello-mcp" }]);
     assert.deepEqual(result.structuredContent, {
       input: "Hello MCP",
@@ -40,19 +44,14 @@ test("MCP server lists and calls portable tools over a transport", async () => {
     });
     assert.equal(invalid.isError, true);
     assert.ok(Array.isArray(invalid.content));
-    const invalidContent = invalid.content[0];
-    assert.equal(invalidContent?.type, "text");
-    assert.match(invalidContent.text, /Invalid arguments/);
+    assert.equal(invalid.content[0]?.type, "text");
+    assert.match(invalid.content[0].text, /Invalid arguments/);
 
-    const unknown = await client.callTool({
-      name: "missing_tool",
-      arguments: {},
-    });
+    const unknown = await client.callTool({ name: "missing_tool", arguments: {} });
     assert.equal(unknown.isError, true);
     assert.ok(Array.isArray(unknown.content));
-    const unknownContent = unknown.content[0];
-    assert.equal(unknownContent?.type, "text");
-    assert.match(unknownContent.text, /Unknown tool: missing_tool/);
+    assert.equal(unknown.content[0]?.type, "text");
+    assert.match(unknown.content[0].text, /Unknown tool: missing_tool/);
   } finally {
     await client.close();
     await server.close();

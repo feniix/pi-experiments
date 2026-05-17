@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import { execFile as execFileCallback } from "node:child_process";
 import { existsSync } from "node:fs";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import { promisify } from "node:util";
@@ -49,10 +49,103 @@ function parsePackOutput(stdout, packDir) {
   return resolve(packDir, basename(filename));
 }
 
+async function readJson(path) {
+  return JSON.parse(await readFile(path, "utf8"));
+}
+
 function textFromContent(content) {
   assert.ok(Array.isArray(content), "tool result content must be an array");
   assert.equal(content[0]?.type, "text");
   return content[0].text;
+}
+
+async function assertSdkRuntimeExports(installDir) {
+  const code = `
+    import assert from "node:assert/strict";
+    import * as core from "@feniix/pi-portable-tools";
+    import * as pi from "@feniix/pi-portable-tools/pi";
+    import * as mcp from "@feniix/pi-portable-tools/mcp";
+    assert.deepEqual(Object.keys(core).sort(), ["definePortableTool", "executePortableTool", "validatePortableToolArgs"]);
+    assert.deepEqual(Object.keys(pi).sort(), ["PortableToolExecutionError", "isPortableToolExecutionError", "registerPiTools"]);
+    assert.deepEqual(Object.keys(mcp).sort(), ["createMcpServer", "runMcpStdioServer"]);
+    assert.equal(["register", "McpTools"].join("") in mcp, false);
+  `;
+  await run(process.execPath, ["--input-type=module", "-e", code], { cwd: installDir });
+}
+
+async function assertSdkTypesCompile(installDir) {
+  const typecheckFile = join(installDir, "sdk-consumer.ts");
+  await writeFile(
+    typecheckFile,
+    `
+      import { Type, type Static } from "typebox";
+      import {
+        definePortableTool,
+        executePortableTool,
+        type PortableToolResult,
+      } from "@feniix/pi-portable-tools";
+      import {
+        isPortableToolExecutionError,
+        PortableToolExecutionError,
+      } from "@feniix/pi-portable-tools/pi";
+      import { type CreateMcpServerOptions } from "@feniix/pi-portable-tools/mcp";
+
+      const params = Type.Object({ text: Type.String() });
+      type Params = Static<typeof params>;
+      const tool = definePortableTool({
+        name: "typecheck_tool",
+        title: "Typecheck Tool",
+        description: "Typecheck fixture.",
+        parameters: params,
+        execute(args) {
+          const typed: Params = args;
+          return { text: typed.text, structuredContent: { text: typed.text } };
+        },
+      });
+
+      const options: CreateMcpServerOptions = {
+        name: "typecheck-server",
+        version: "0.1.0",
+        tools: [tool],
+      };
+      void options;
+
+      async function run(): Promise<PortableToolResult> {
+        return executePortableTool(tool, { text: "hello" }, { host: "test" });
+      }
+      void run;
+
+      const error: unknown = new PortableToolExecutionError({
+        text: "bad",
+        structuredContent: { validationErrors: [] },
+        isError: true,
+      });
+      if (isPortableToolExecutionError(error)) {
+        const details: Record<string, unknown> = error.details;
+        const validationErrors = error.details.validationErrors;
+        void details;
+        void validationErrors;
+      }
+    `,
+  );
+
+  const tsc = join(repoRoot, "node_modules", ".bin", process.platform === "win32" ? "tsc.cmd" : "tsc");
+  await run(
+    tsc,
+    [
+      "--noEmit",
+      "--target",
+      "ES2022",
+      "--module",
+      "NodeNext",
+      "--moduleResolution",
+      "NodeNext",
+      "--strict",
+      "--skipLibCheck",
+      typecheckFile,
+    ],
+    { cwd: installDir },
+  );
 }
 
 let tempRoot;
@@ -66,13 +159,34 @@ try {
   await mkdir(packDir, { recursive: true });
   await mkdir(installDir, { recursive: true });
 
-  const pack = await run("npm", ["pack", "--workspace", "@feniix/pi-text-utils", "--pack-destination", packDir, "--json"]);
-  const tarballPath = parsePackOutput(pack.stdout, packDir);
-  assert.ok(existsSync(tarballPath), `expected tarball to exist: ${tarballPath}`);
+  const sdkPack = await run("npm", [
+    "pack",
+    "--workspace",
+    "@feniix/pi-portable-tools",
+    "--pack-destination",
+    packDir,
+    "--json",
+  ]);
+  const sdkTarballPath = parsePackOutput(sdkPack.stdout, packDir);
+  assert.ok(existsSync(sdkTarballPath), `expected SDK tarball to exist: ${sdkTarballPath}`);
+
+  const textUtilsPack = await run("npm", [
+    "pack",
+    "--workspace",
+    "@feniix/pi-text-utils",
+    "--pack-destination",
+    packDir,
+    "--json",
+  ]);
+  const textUtilsTarballPath = parsePackOutput(textUtilsPack.stdout, packDir);
+  assert.ok(existsSync(textUtilsTarballPath), `expected text-utils tarball to exist: ${textUtilsTarballPath}`);
 
   await writeFile(join(installDir, "package.json"), JSON.stringify({ type: "module", private: true }, null, 2));
-  await run("npm", ["install", "--omit=dev", "--ignore-scripts", tarballPath], { cwd: installDir });
+  await run("npm", ["install", "--omit=dev", "--ignore-scripts", sdkTarballPath, textUtilsTarballPath], {
+    cwd: installDir,
+  });
 
+  const installedSdkDir = join(installDir, "node_modules", "@feniix", "pi-portable-tools");
   const installedPackageDir = join(installDir, "node_modules", "@feniix", "pi-text-utils");
   const installedServer = join(installedPackageDir, "dist", "src", "mcp-server.js");
   const installedPiExtension = join(installedPackageDir, "dist", "extensions", "index.js");
@@ -82,9 +196,23 @@ try {
     ".bin",
     process.platform === "win32" ? "pi-text-utils-mcp.cmd" : "pi-text-utils-mcp",
   );
+
+  assert.ok(existsSync(join(installedSdkDir, "dist", "src", "index.js")), "missing installed SDK root entrypoint");
+  assert.ok(existsSync(join(installedSdkDir, "dist", "src", "pi.js")), "missing installed SDK pi entrypoint");
+  assert.ok(existsSync(join(installedSdkDir, "dist", "src", "mcp.js")), "missing installed SDK MCP entrypoint");
   assert.ok(existsSync(installedServer), `missing installed MCP server entrypoint: ${installedServer}`);
   assert.ok(existsSync(installedPiExtension), `missing installed pi extension entrypoint: ${installedPiExtension}`);
   assert.ok(existsSync(installedBin), `missing installed MCP bin shim: ${installedBin}`);
+
+  const textUtilsPackage = await readJson(join(installedPackageDir, "package.json"));
+  const sdkPackage = await readJson(join(installedSdkDir, "package.json"));
+  const sdkRange = textUtilsPackage.dependencies?.["@feniix/pi-portable-tools"];
+  assert.equal(sdkRange, "0.1.0");
+  assert.doesNotMatch(sdkRange, /^(workspace:|file:)/);
+  assert.equal(sdkPackage.version, "0.1.0");
+
+  await assertSdkRuntimeExports(installDir);
+  await assertSdkTypesCompile(installDir);
 
   const extensionModule = await import(pathToFileURL(installedPiExtension).href);
   const registeredTools = [];
@@ -108,6 +236,12 @@ try {
   client = new Client({ name: "pi-text-utils-package-smoke", version: "0.1.0" });
   await withTimeout(client.connect(transport), "MCP client connect");
 
+  const list = await withTimeout(client.listTools(), "MCP listTools");
+  assert.deepEqual(
+    list.tools.map((tool) => tool.name).sort(),
+    ["text_stats", "text_transform"],
+  );
+
   const result = await withTimeout(
     client.callTool({
       name: "text_transform",
@@ -126,8 +260,21 @@ try {
   });
   assert.equal(result.isError, false);
 
-  console.log("✓ packed package installs into a clean temp project");
-  console.log("✓ installed MCP bin serves text_transform from declared dependencies");
+  const invalid = await withTimeout(
+    client.callTool({
+      name: "text_transform",
+      arguments: { text: "Hello", operation: "not-a-real-operation" },
+    }),
+    "MCP invalid text_transform call",
+  );
+  assert.equal(invalid.isError, true);
+  assert.match(textFromContent(invalid.content), /Invalid arguments for text_transform/);
+  assert.deepEqual(invalid.structuredContent?.tool, "text_transform");
+  assert.ok(Array.isArray(invalid.structuredContent?.validationErrors));
+
+  console.log("✓ packed SDK and text-utils packages install into a clean temp project");
+  console.log("✓ installed SDK runtime and declaration subpath exports work");
+  console.log("✓ installed MCP bin lists and serves text_transform from declared dependencies");
   console.log("✓ installed package includes and loads pi extension entrypoint");
 } catch (error) {
   if (stderr.trim()) {

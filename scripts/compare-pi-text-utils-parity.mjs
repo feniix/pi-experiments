@@ -8,7 +8,7 @@ import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js"
 import {
   isPortableToolExecutionError,
   registerPiTools,
-} from "../packages/pi-text-utils/dist/src/adapters/pi.js";
+} from "@feniix/pi-portable-tools/pi";
 import { textUtilsTools } from "../packages/pi-text-utils/dist/src/tools/index.js";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");

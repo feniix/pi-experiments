@@ -10,6 +10,10 @@ const packageRoot = join(repoRoot, "packages", "pi-portable-tools");
 const requiredFiles = [
   "dist/src/index.js",
   "dist/src/index.d.ts",
+  "dist/src/pi.js",
+  "dist/src/pi.d.ts",
+  "dist/src/mcp.js",
+  "dist/src/mcp.d.ts",
 ];
 
 for (const file of requiredFiles) {
@@ -17,7 +21,19 @@ for (const file of requiredFiles) {
   assert.ok(existsSync(path), `missing SDK dist file: ${file}`);
 }
 
-const indexJs = readFileSync(join(packageRoot, "dist/src/index.js"), "utf8");
-assert.doesNotMatch(indexJs, /registerMcpTools/, "SDK root must not export registerMcpTools");
+const publicEntries = [
+  "dist/src/index.js",
+  "dist/src/index.d.ts",
+  "dist/src/pi.js",
+  "dist/src/pi.d.ts",
+  "dist/src/mcp.js",
+  "dist/src/mcp.d.ts",
+];
 
-console.log("✓ pi-portable-tools core dist entrypoints are present");
+for (const file of publicEntries) {
+  const contents = readFileSync(join(packageRoot, file), "utf8");
+  assert.doesNotMatch(contents, /registerMcpTools/, `${file} must not export registerMcpTools`);
+}
+
+console.log("✓ pi-portable-tools dist entrypoints are present");
+console.log("✓ pi-portable-tools public entries do not expose registerMcpTools");
