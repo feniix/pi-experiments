@@ -24,9 +24,13 @@ function withTimeout(promise, label, timeoutMs = DEFAULT_TIMEOUT_MS) {
   ]).finally(() => clearTimeout(timeout));
 }
 
+function executable(command) {
+  return process.platform === "win32" && command === "npm" ? "npm.cmd" : command;
+}
+
 async function run(command, args, options = {}) {
   try {
-    return await execFile(command, args, {
+    return await execFile(executable(command), args, {
       cwd: repoRoot,
       maxBuffer: 10 * 1024 * 1024,
       timeout: DEFAULT_TIMEOUT_MS,
@@ -205,6 +209,41 @@ try {
     existsSync(join(bundledSdkDir, "dist", "src", "mcp.js")),
     "pi-text-utils tarball must install its bundled SDK dependency when installed alone",
   );
+  const standaloneBin = join(
+    installTextUtilsOnlyDir,
+    "node_modules",
+    ".bin",
+    process.platform === "win32" ? "pi-text-utils-mcp.cmd" : "pi-text-utils-mcp",
+  );
+  const standaloneTransport = new StdioClientTransport({
+    command: standaloneBin,
+    args: [],
+    cwd: installTextUtilsOnlyDir,
+    stderr: "pipe",
+  });
+  standaloneTransport.stderr?.on("data", (chunk) => {
+    stderr += chunk.toString();
+  });
+  const standaloneClient = new Client({ name: "pi-text-utils-standalone-package-smoke", version: "0.1.0" });
+  try {
+    await withTimeout(standaloneClient.connect(standaloneTransport), "standalone MCP client connect");
+    const standaloneList = await withTimeout(standaloneClient.listTools(), "standalone MCP listTools");
+    assert.deepEqual(
+      standaloneList.tools.map((tool) => tool.name).sort(),
+      ["text_stats", "text_transform"],
+    );
+    const standaloneResult = await withTimeout(
+      standaloneClient.callTool({
+        name: "text_transform",
+        arguments: { text: "Standalone Package Smoke", operation: "slugify" },
+      }),
+      "standalone MCP text_transform call",
+    );
+    assert.equal(textFromContent(standaloneResult.content), "standalone-package-smoke");
+    assert.equal(standaloneResult.isError, false);
+  } finally {
+    await withTimeout(standaloneClient.close(), "standalone MCP client close", 5_000).catch(() => undefined);
+  }
 
   await writeFile(join(installDir, "package.json"), JSON.stringify({ type: "module", private: true }, null, 2));
   await run("npm", ["install", "--omit=dev", "--ignore-scripts", sdkTarballPath, textUtilsTarballPath], {
