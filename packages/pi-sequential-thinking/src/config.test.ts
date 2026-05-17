@@ -45,6 +45,21 @@ test("falls back to config and defaults in effective config", () => {
   });
 });
 
+test("ignores non-positive output limits when resolving effective config", () => {
+  const effective = resolveEffectiveConfig({
+    flags: { maxBytes: "0", maxLines: "-1" },
+    env: { SEQ_THINK_MAX_BYTES: "0", SEQ_THINK_MAX_LINES: "-1" },
+    config: {
+      config: { maxBytes: 0, maxLines: -1 },
+      sources: { maxBytes: "config_file", maxLines: "config_file" },
+    },
+  });
+
+  assert.equal(effective.maxBytes, 51200);
+  assert.equal(effective.maxLines, 2000);
+  assert.deepEqual(effective.sources, { storageDir: "default", maxBytes: "default", maxLines: "default" });
+});
+
 test("normalizes strings, numbers, and config files", () => {
   assert.equal(normalizeString("  hello  "), "hello");
   assert.equal(normalizeString("   "), undefined);

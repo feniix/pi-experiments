@@ -27,7 +27,15 @@ export enum ThoughtStage {
   CONCLUSION = "Conclusion",
 }
 
-const THOUGHT_STAGE_VALUES = Object.values(ThoughtStage);
+export const THOUGHT_STAGES = Object.freeze([
+  ThoughtStage.PROBLEM_DEFINITION,
+  ThoughtStage.RESEARCH,
+  ThoughtStage.ANALYSIS,
+  ThoughtStage.SYNTHESIS,
+  ThoughtStage.CONCLUSION,
+] as const);
+
+const THOUGHT_STAGE_VALUES: readonly ThoughtStage[] = THOUGHT_STAGES;
 
 export function parseThoughtStage(value: string): ThoughtStage {
   const normalized = value.toLowerCase().trim();
@@ -242,7 +250,7 @@ export function normalizeSessionId(value: unknown): SessionInfo {
   return { sessionId, sessionLabel: sessionId };
 }
 
-function readSession(args: Record<string, unknown>): { session?: SessionInfo; errors: ValidationError[] } {
+export function readSession(args: Record<string, unknown>): { session?: SessionInfo; errors: ValidationError[] } {
   const errors: ValidationError[] = [];
   const hasSnake = hasOwn(args, "session_id");
   const hasCamel = hasOwn(args, "sessionId");
@@ -267,6 +275,14 @@ function readSession(args: Record<string, unknown>): { session?: SessionInfo; er
     }
     throw error;
   }
+}
+
+export function normalizeSessionFromArgs(args: Record<string, unknown>): SessionInfo {
+  const result = readSession(args);
+  if (result.errors.length > 0) {
+    throw new ThoughtValidationError(result.errors);
+  }
+  return result.session ?? normalizeSessionId(undefined);
 }
 
 export function normalizeThoughtInput(
@@ -379,36 +395,15 @@ export function normalizeThoughtInput(
 }
 
 export function validateThoughtData(data: Partial<ThoughtData>): ValidationError[] {
-  const errors: ValidationError[] = [];
-
-  if (!data.thought?.trim()) {
-    errors.push({ field: "thought", message: "Thought content cannot be empty" });
-  }
-
-  if (data.thought_number === undefined || !isPositiveInteger(data.thought_number)) {
-    errors.push({ field: "thought_number", message: "Thought number must be a positive integer" });
-  }
-
-  if (data.total_thoughts === undefined || !isPositiveInteger(data.total_thoughts)) {
-    errors.push({ field: "total_thoughts", message: "Total thoughts must be a positive integer" });
-  }
-
-  if (data.next_thought_needed !== undefined && typeof data.next_thought_needed !== "boolean") {
-    errors.push({ field: "next_thought_needed", message: "next_thought_needed must be a boolean" });
-  }
-
-  if (data.stage !== undefined && !THOUGHT_STAGE_VALUES.includes(data.stage)) {
-    errors.push({ field: "stage", message: "stage must be a valid ThoughtStage" });
-  }
-
-  for (const field of ["tags", "axioms_used", "assumptions_challenged"] as const) {
-    const value = data[field];
-    if (value !== undefined && (!Array.isArray(value) || value.some((item) => typeof item !== "string"))) {
-      errors.push({ field, message: `${field} must be an array of strings` });
+  try {
+    normalizeThoughtInput(data as Record<string, unknown>, { id: data.id, timestamp: data.timestamp });
+    return [];
+  } catch (error) {
+    if (error instanceof ThoughtValidationError) {
+      return error.errors;
     }
+    throw error;
   }
-
-  return errors;
 }
 
 export function isValidThoughtData(data: Partial<ThoughtData>): boolean {

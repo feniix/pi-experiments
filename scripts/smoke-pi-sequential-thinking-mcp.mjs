@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import assert from "node:assert/strict";
-import { existsSync, mkdtempSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -132,4 +132,5 @@ try {
   throw error;
 } finally {
   await withTimeout(client.close(), "MCP client close", 5_000).catch(() => undefined);
+  rmSync(storageDir, { recursive: true, force: true });
 }

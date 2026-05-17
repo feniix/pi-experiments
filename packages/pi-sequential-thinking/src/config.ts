@@ -1,7 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { isAbsolute, join, resolve } from "node:path";
-import type { EffectiveConfigStatus } from "./storage.js";
 import { isRecord } from "./types.js";
 
 export const DEFAULT_MAX_BYTES = 51200;
@@ -18,6 +17,17 @@ export interface SeqThinkConfig {
 export interface SeqThinkConfigWithSources {
   config: SeqThinkConfig;
   sources: Partial<Record<keyof SeqThinkConfig, ConfigSource>>;
+}
+
+export interface EffectiveConfigStatus {
+  storageDir?: string;
+  maxBytes: number;
+  maxLines: number;
+  sources: {
+    storageDir: string;
+    maxBytes: string;
+    maxLines: string;
+  };
 }
 
 export interface ResolveEffectiveConfigInput {
@@ -61,6 +71,14 @@ export function normalizeNumber(value: unknown): number | undefined {
     }
   }
   return undefined;
+}
+
+function normalizePositiveInteger(value: unknown): number | undefined {
+  const normalized = normalizeNumber(value);
+  if (normalized === undefined || !Number.isInteger(normalized) || normalized < 1) {
+    return undefined;
+  }
+  return normalized;
 }
 
 export function resolveConfigPath(configPath: string, context: ConfigLoadContext = {}): string {
@@ -219,13 +237,13 @@ export function resolveEffectiveConfig(input: ResolveEffectiveConfigInput = {}):
   const envStorageDir = normalizeString(env.MCP_STORAGE_DIR);
   const configStorageDir = config?.config.storageDir;
 
-  const flagMaxBytes = normalizeNumber(flags.maxBytes);
-  const envMaxBytes = normalizeNumber(env.SEQ_THINK_MAX_BYTES);
-  const configMaxBytes = config?.config.maxBytes;
+  const flagMaxBytes = normalizePositiveInteger(flags.maxBytes);
+  const envMaxBytes = normalizePositiveInteger(env.SEQ_THINK_MAX_BYTES);
+  const configMaxBytes = normalizePositiveInteger(config?.config.maxBytes);
 
-  const flagMaxLines = normalizeNumber(flags.maxLines);
-  const envMaxLines = normalizeNumber(env.SEQ_THINK_MAX_LINES);
-  const configMaxLines = config?.config.maxLines;
+  const flagMaxLines = normalizePositiveInteger(flags.maxLines);
+  const envMaxLines = normalizePositiveInteger(env.SEQ_THINK_MAX_LINES);
+  const configMaxLines = normalizePositiveInteger(config?.config.maxLines);
 
   const storageDir = flagStorageDir ?? envStorageDir ?? configStorageDir;
 
@@ -241,20 +259,22 @@ export function resolveEffectiveConfig(input: ResolveEffectiveConfigInput = {}):
           : configStorageDir
             ? (config?.sources.storageDir ?? "config_file")
             : "default",
-      maxBytes: flagMaxBytes
-        ? "flag"
-        : envMaxBytes
-          ? "env"
-          : configMaxBytes
-            ? (config?.sources.maxBytes ?? "config_file")
-            : "default",
-      maxLines: flagMaxLines
-        ? "flag"
-        : envMaxLines
-          ? "env"
-          : configMaxLines
-            ? (config?.sources.maxLines ?? "config_file")
-            : "default",
+      maxBytes:
+        flagMaxBytes !== undefined
+          ? "flag"
+          : envMaxBytes !== undefined
+            ? "env"
+            : configMaxBytes !== undefined
+              ? (config?.sources.maxBytes ?? "config_file")
+              : "default",
+      maxLines:
+        flagMaxLines !== undefined
+          ? "flag"
+          : envMaxLines !== undefined
+            ? "env"
+            : configMaxLines !== undefined
+              ? (config?.sources.maxLines ?? "config_file")
+              : "default",
     },
   };
 }

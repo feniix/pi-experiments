@@ -87,4 +87,14 @@ test("generates empty and populated summaries", () => {
     { number: 3, stage: ThoughtStage.ANALYSIS },
   ]);
   assert.deepEqual(summary.topTags[0], { tag: "tag1", count: 2 });
+  assert.equal(summary.completionStatus.hasAllStages, false);
+
+  const completeSummary = analyzer.generateSummary([
+    ...thoughts,
+    createThought({ id: "4", thought_number: 4, stage: ThoughtStage.SYNTHESIS, total_thoughts: 5 }),
+    createThought({ id: "5", thought_number: 5, stage: ThoughtStage.CONCLUSION, total_thoughts: 5 }),
+  ]).summary;
+  assert.notEqual(typeof completeSummary, "string");
+  if (typeof completeSummary === "string") throw new Error("expected structured summary");
+  assert.equal(completeSummary.completionStatus.hasAllStages, true);
 });

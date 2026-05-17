@@ -1,5 +1,4 @@
 import type { PortableTool, PortableToolResult } from "@feniix/pi-portable-tools";
-import { executePortableTool } from "@feniix/pi-portable-tools";
 import type { TSchema } from "typebox";
 
 export type PiContent = { type: "text"; text: string };
@@ -64,7 +63,7 @@ export function registerSequentialThinkingPiTools(
         }
 
         try {
-          const result = await executePortableTool(tool, params, { host: "pi", signal });
+          const result = await tool.execute((params ?? {}) as Record<string, unknown>, { host: "pi", signal });
           return toPiResult(result);
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error);

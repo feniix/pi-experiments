@@ -1,8 +1,13 @@
-import { writeFileSync } from "node:fs";
+import { randomUUID } from "node:crypto";
+import { chmodSync, mkdirSync, readdirSync, statSync, unlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DEFAULT_MAX_BYTES, DEFAULT_MAX_LINES, normalizeNumber } from "./config.js";
 import type { ValidationError } from "./types.js";
+
+const OVERFLOW_DIR = join(tmpdir(), "pi-sequential-thinking-overflow");
+const OVERFLOW_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+const OVERFLOW_MAX_FILE_BYTES = 10 * 1024 * 1024;
 
 export interface SequentialThinkingToolDetails {
   tool: string;
@@ -150,16 +155,48 @@ export function formatToolOutput(
 }
 
 export function writeTempFile(toolName: string, content: string): string | undefined {
+  if (byteLength(content) > OVERFLOW_MAX_FILE_BYTES) {
+    console.warn("[pi-sequential-thinking] Could not write truncation overflow file: output exceeded 10 MiB cap");
+    return undefined;
+  }
+
   const safeName = toolName.replace(/[^a-z0-9_-]/gi, "_");
-  const filename = `pi-seq-think-${safeName}-${Date.now()}.txt`;
-  const filePath = join(tmpdir(), filename);
+  const filename = `pi-seq-think-${safeName}-${Date.now()}-${randomUUID()}.txt`;
+  const filePath = join(OVERFLOW_DIR, filename);
   try {
-    writeFileSync(filePath, content, "utf-8");
+    ensureOverflowDir();
+    cleanupOldOverflowFiles();
+    writeFileSync(filePath, content, { encoding: "utf-8", mode: 0o600, flag: "wx" });
     return filePath;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.warn(`[pi-sequential-thinking] Could not write truncation overflow file: ${message}`);
     return undefined;
+  }
+}
+
+function ensureOverflowDir(): void {
+  mkdirSync(OVERFLOW_DIR, { recursive: true, mode: 0o700 });
+  if (process.platform !== "win32") {
+    chmodSync(OVERFLOW_DIR, 0o700);
+  }
+}
+
+function cleanupOldOverflowFiles(): void {
+  const cutoff = Date.now() - OVERFLOW_MAX_AGE_MS;
+  for (const entry of readdirSync(OVERFLOW_DIR)) {
+    if (!entry.startsWith("pi-seq-think-") || !entry.endsWith(".txt")) {
+      continue;
+    }
+    const filePath = join(OVERFLOW_DIR, entry);
+    try {
+      const stat = statSync(filePath);
+      if (stat.isFile() && stat.mtimeMs < cutoff) {
+        unlinkSync(filePath);
+      }
+    } catch {
+      // Best effort cleanup should never mask the current tool response.
+    }
   }
 }
 

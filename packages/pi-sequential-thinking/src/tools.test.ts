@@ -67,6 +67,10 @@ test("process_thought records analysis, receipts, aliases, and case-insensitive 
   assert.equal(result.isError, false);
   assert.equal(result.structuredContent?.tool, "process_thought");
   const processed = parseJsonResult(result);
+  assert.equal(
+    (result.structuredContent?.result as { receipt?: { operation?: unknown } }).receipt?.operation,
+    "process_thought",
+  );
   assert.equal(processed.thoughtAnalysis.currentThought.totalThoughts, 5);
   assert.deepEqual(processed.receipt, {
     operation: "process_thought",
@@ -218,5 +222,6 @@ test("per-call output limits are clamped and report truncation details", async (
 
   assert.equal(result.isError, false);
   assert.equal(result.structuredContent?.truncated, true);
+  assert.deepEqual((result.structuredContent?.result as { omitted?: boolean }).omitted, true);
   assert.match(result.text, /Output truncated/);
 });

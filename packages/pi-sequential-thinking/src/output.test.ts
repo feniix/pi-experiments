@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { existsSync, unlinkSync } from "node:fs";
+import { existsSync, statSync, unlinkSync } from "node:fs";
 import test from "node:test";
 import { formatToolOutput, resolveEffectiveLimits, splitParams, toJsonString, writeTempFile } from "./output.js";
 
@@ -36,10 +36,21 @@ test("formats simple and truncated tool output", () => {
   if (typeof truncated.details.tempFile === "string") unlinkSync(truncated.details.tempFile);
 });
 
-test("writes temp files with sanitized names", () => {
+test("writes temp files with sanitized names and caps oversized overflow", () => {
   const path = writeTempFile("my-tool!@#", "content");
   assert.ok(path);
   assert.match(path, /my-tool__/);
   assert.equal(existsSync(path), true);
+  if (process.platform !== "win32") {
+    assert.equal(statSync(path).mode & 0o077, 0);
+  }
   unlinkSync(path);
+
+  const originalWarn = console.warn;
+  console.warn = () => undefined;
+  try {
+    assert.equal(writeTempFile("huge", "x".repeat(10 * 1024 * 1024 + 1)), undefined);
+  } finally {
+    console.warn = originalWarn;
+  }
 });

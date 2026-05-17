@@ -2,7 +2,7 @@
  * ThoughtAnalyzer - Analysis and insights for sequential thinking
  */
 
-import type { ThoughtData } from "./types.js";
+import { THOUGHT_STAGES, type ThoughtData } from "./types.js";
 
 // =============================================================================
 // ThoughtAnalyzer Class
@@ -177,7 +177,7 @@ export class ThoughtAnalyzer {
     const percentComplete = maxTotal > 0 ? (thoughts.length / maxTotal) * 100 : 0;
 
     // Check if all stages are represented
-    const allStagesPresent = Object.keys(stages).length === 5;
+    const allStagesPresent = THOUGHT_STAGES.every((stage) => (stages[stage]?.length ?? 0) > 0);
 
     // Create timeline
     const sortedThoughts = [...thoughts].sort((a, b) => a.thought_number - b.thought_number);

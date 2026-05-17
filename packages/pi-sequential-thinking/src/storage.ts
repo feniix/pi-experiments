@@ -7,19 +7,23 @@ import type { Dir } from "node:fs";
 import {
   accessSync,
   chmodSync,
+  closeSync,
   existsSync,
   constants as fsConstants,
   lstatSync,
   mkdirSync,
   opendirSync,
+  openSync,
   readFileSync,
   renameSync,
   statSync,
   unlinkSync,
   writeFileSync,
+  writeSync,
 } from "node:fs";
 import { homedir } from "node:os";
 import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";
+import type { EffectiveConfigStatus } from "./config.js";
 import {
   DEFAULT_HISTORY_LIMIT,
   isRecord,
@@ -95,17 +99,6 @@ export interface ThinkingHistory {
   thoughts: HistoryThoughtItem[];
 }
 
-export interface EffectiveConfigStatus {
-  storageDir?: string;
-  maxBytes: number;
-  maxLines: number;
-  sources: {
-    storageDir: string;
-    maxBytes: string;
-    maxLines: string;
-  };
-}
-
 export interface SessionStatusMetadata {
   sessionId: string | null;
   label: string;
@@ -148,6 +141,8 @@ interface ThoughtStorageOptions {
   homeDir?: string;
 }
 
+const SESSION_LOCK_STALE_MS = 30_000;
+
 // =============================================================================
 // Storage Class
 // =============================================================================
@@ -156,13 +151,19 @@ export class ThoughtStorage {
   private readonly storageDir: string;
   private readonly currentSessionFile: string;
   private readonly homeDir: string;
+  private initializationError: string | undefined;
 
   constructor(storageDir?: string, options: ThoughtStorageOptions = {}) {
     this.storageDir = storageDir ? resolve(storageDir) : join(homedir(), ".mcp_sequential_thinking");
     this.homeDir = options.homeDir ? resolve(options.homeDir) : homedir();
-
-    this.ensureDirectory(this.storageDir);
     this.currentSessionFile = join(this.storageDir, "current_session.json");
+
+    try {
+      this.ensureDirectory(this.storageDir);
+    } catch (error) {
+      this.initializationError = this.diagnosticForError(error);
+      console.warn(`[pi-sequential-thinking] Storage initialization failed: ${this.initializationError}`);
+    }
 
     // Load default once at startup for compatibility with corrupted-file backup behavior.
     // OS-level errors (EACCES, EMFILE, etc.) must not crash the constructor — the
@@ -184,12 +185,18 @@ export class ThoughtStorage {
   // =============================================================================
 
   addThought(thought: ThoughtData, sessionId?: string | null): SessionOperationResult {
+    return this.addThoughts([thought], sessionId);
+  }
+
+  addThoughts(newThoughts: ThoughtData[], sessionId?: string | null): SessionOperationResult {
     const session = normalizeSessionId(sessionId);
-    const loaded = this.loadSession(session.sessionId);
-    const preCount = loaded.thoughts.length;
-    const thoughts = [...loaded.thoughts, thought];
-    const savedAt = this.saveSession(session.sessionId, thoughts);
-    return this.createOperationResult(session, preCount, thoughts.length, thoughts, savedAt, true);
+    return this.withSessionLock(session.sessionId, () => {
+      const loaded = this.loadSession(session.sessionId);
+      const preCount = loaded.thoughts.length;
+      const thoughts = [...loaded.thoughts, ...newThoughts];
+      const savedAt = this.saveSession(session.sessionId, thoughts);
+      return this.createOperationResult(session, preCount, thoughts.length, thoughts, savedAt, newThoughts.length > 0);
+    });
   }
 
   getAllThoughts(sessionId?: string | null): ThoughtData[] {
@@ -199,10 +206,12 @@ export class ThoughtStorage {
 
   clearHistory(sessionId?: string | null): SessionOperationResult {
     const session = normalizeSessionId(sessionId);
-    const loaded = this.loadSession(session.sessionId);
-    const preCount = loaded.thoughts.length;
-    const savedAt = this.saveSession(session.sessionId, []);
-    return this.createOperationResult(session, preCount, 0, [], savedAt, preCount > 0);
+    return this.withSessionLock(session.sessionId, () => {
+      const loaded = this.loadSession(session.sessionId);
+      const preCount = loaded.thoughts.length;
+      const savedAt = this.saveSession(session.sessionId, []);
+      return this.createOperationResult(session, preCount, 0, [], savedAt, preCount > 0);
+    });
   }
 
   getHistory(request: HistoryRequest = {}): ThinkingHistory {
@@ -218,8 +227,13 @@ export class ThoughtStorage {
       throw new Error("offset must be a non-negative integer");
     }
 
-    this.ensureHistoryFileWithinSizeLimit(this.resolveSessionFile(session.sessionId));
-    const thoughts = this.loadSession(session.sessionId).thoughts;
+    const sessionFile = this.resolveSessionFile(session.sessionId);
+    this.ensureHistoryFileWithinSizeLimit(sessionFile);
+    const thoughts = this.loadSessionFile(sessionFile, {
+      missingAsEmpty: true,
+      backupCorrupted: false,
+      explicitImport: false,
+    }).thoughts;
     const selected = thoughts.slice(offset, offset + limit);
 
     return {
@@ -278,31 +292,33 @@ export class ThoughtStorage {
       );
     }
 
-    const previous = this.loadSession(targetSession.sessionId).thoughts;
-    const importedAt = new Date().toISOString();
-    const savedAt = this.saveSession(targetSession.sessionId, loaded.thoughts);
-    // `changed` should reflect content drift only, not the savedAt timestamp.
-    // Compare content fingerprints (which exclude lastUpdated) so re-importing
-    // identical content reports changed=false.
-    const changed =
-      this.contentFingerprintFor(targetSession, previous) !==
-      this.contentFingerprintFor(targetSession, loaded.thoughts);
-    const result = this.createOperationResult(
-      targetSession,
-      previous.length,
-      loaded.thoughts.length,
-      loaded.thoughts,
-      savedAt,
-      changed,
-    );
+    return this.withSessionLock(targetSession.sessionId, () => {
+      const previous = this.loadSession(targetSession.sessionId).thoughts;
+      const importedAt = new Date().toISOString();
+      const savedAt = this.saveSession(targetSession.sessionId, loaded.thoughts);
+      // `changed` should reflect content drift only, not the savedAt timestamp.
+      // Compare content fingerprints (which exclude lastUpdated) so re-importing
+      // identical content reports changed=false.
+      const changed =
+        this.contentFingerprintFor(targetSession, previous) !==
+        this.contentFingerprintFor(targetSession, loaded.thoughts);
+      const result = this.createOperationResult(
+        targetSession,
+        previous.length,
+        loaded.thoughts.length,
+        loaded.thoughts,
+        savedAt,
+        changed,
+      );
 
-    return {
-      ...result,
-      importedAt,
-      embeddedSessionId: loaded.embeddedSessionId,
-      overwroteExistingThoughts: previous.length > 0,
-      warnings: warnings.length > 0 ? warnings : undefined,
-    };
+      return {
+        ...result,
+        importedAt,
+        embeddedSessionId: loaded.embeddedSessionId,
+        overwroteExistingThoughts: previous.length > 0,
+        warnings: warnings.length > 0 ? warnings : undefined,
+      };
+    });
   }
 
   getStatus(options: { effectiveConfig?: EffectiveConfigStatus } = {}): ThinkingStatus {
@@ -326,8 +342,10 @@ export class ThoughtStorage {
 
     const corruptSessionCount = sessions.filter((session) => session.corrupt).length;
     const backupListing = this.listBackupFiles();
-    const complete = namedSessionsComplete && backupListing.complete && corruptSessionCount === 0;
+    const complete =
+      !this.initializationError && namedSessionsComplete && backupListing.complete && corruptSessionCount === 0;
     const completenessReasons = [
+      this.initializationError ? `Storage initialization failed: ${this.initializationError}` : undefined,
       namedSessionListing.overflowed
         ? `Named session count exceeds threshold ${STATUS_ENUMERATION_SESSION_THRESHOLD}; status is partial.`
         : undefined,
@@ -399,6 +417,48 @@ export class ThoughtStorage {
     return lastUpdated;
   }
 
+  private withSessionLock<T>(sessionId: string | null, operation: () => T): T {
+    const session = normalizeSessionId(sessionId);
+    const sessionFile = this.resolveSessionFile(session.sessionId);
+    const lockPath = `${sessionFile}.lock`;
+    this.ensureDirectory(dirname(sessionFile));
+
+    const start = Date.now();
+    let lockFd: number | undefined;
+    while (lockFd === undefined) {
+      try {
+        lockFd = openSync(lockPath, "wx", 0o600);
+        writeSync(lockFd, JSON.stringify({ pid: process.pid, createdAt: new Date().toISOString() }));
+        this.restrictFilePermissions(lockPath);
+      } catch (error) {
+        if (!this.isErrorCode(error, "EEXIST")) {
+          throw error;
+        }
+        if (this.removeStaleSessionLock(lockPath)) {
+          continue;
+        }
+        if (Date.now() - start > 5_000) {
+          throw new Error(`Timed out waiting for session lock: ${this.redactPath(lockPath).value}`);
+        }
+        this.sleep(25);
+      }
+    }
+
+    try {
+      return operation();
+    } finally {
+      try {
+        closeSync(lockFd);
+      } finally {
+        try {
+          unlinkSync(lockPath);
+        } catch {
+          // Best effort: the write has completed, so stale cleanup should not mask the operation result.
+        }
+      }
+    }
+  }
+
   private getSessionMetadata(sessionId: string | null): SessionStatusMetadata {
     const session = normalizeSessionId(sessionId);
     try {
@@ -458,22 +518,32 @@ export class ThoughtStorage {
       );
     }
 
+    let content: string;
     try {
-      const content = readFileSync(filePath, "utf-8");
-      const data = JSON.parse(content) as unknown;
-      return this.parseSessionData(data, options.explicitImport);
+      content = readFileSync(filePath, "utf-8");
     } catch (error) {
-      if (options.backupCorrupted) {
-        console.warn(`[pi-sequential-thinking] Error loading ${this.redactPath(filePath).value}: ${error}`);
-        this.backupCorruptedFile(filePath);
-        return { thoughts: [], lastUpdated: null, warnings: [] };
-      }
+      throw new Error(
+        `Could not read session file ${this.redactPath(filePath).value}: ${this.diagnosticForError(error)}`,
+      );
+    }
+
+    try {
+      const data = JSON.parse(content) as unknown;
+      return this.parseSessionData(data);
+    } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
+      if (options.backupCorrupted) {
+        console.warn(`[pi-sequential-thinking] Error loading ${this.redactPath(filePath).value}: ${message}`);
+        if (this.backupCorruptedFile(filePath)) {
+          return { thoughts: [], lastUpdated: null, warnings: [] };
+        }
+        throw new Error(`Invalid session file ${this.redactPath(filePath).value}: ${message}`);
+      }
       throw new Error(`Invalid session file ${this.redactPath(filePath).value}: ${message}`);
     }
   }
 
-  private parseSessionData(data: unknown, _explicitImport: boolean): StoredSession {
+  private parseSessionData(data: unknown): StoredSession {
     if (Array.isArray(data)) {
       const normalized = this.normalizeThoughtRecords(data);
       return {
@@ -562,19 +632,24 @@ export class ThoughtStorage {
 
   private saveToFile(filePath: string, data: Record<string, unknown>): void {
     this.ensureDirectory(dirname(filePath));
+    const serialized = JSON.stringify(data, null, 2);
+    if (Buffer.byteLength(serialized, "utf-8") > MAX_IMPORT_BYTES) {
+      throw new Error("Session file exceeds maximum size of 10 MiB");
+    }
     const tempPath = `${filePath}.tmp.${Date.now()}.${Math.random().toString(16).slice(2)}`;
-    writeFileSync(tempPath, JSON.stringify(data, null, 2), { encoding: "utf-8", mode: 0o600 });
-    this.restrictFilePermissions(tempPath);
+    let renamed = false;
     try {
+      writeFileSync(tempPath, serialized, { encoding: "utf-8", mode: 0o600 });
+      this.restrictFilePermissions(tempPath);
       renameSync(tempPath, filePath);
+      renamed = true;
     } catch (error) {
-      // Avoid leaving a writable temp file behind when the atomic rename fails
-      // (ENOSPC, EACCES, cross-device). The temp file's content is unpublished
-      // so unlinking is the safe cleanup.
-      try {
-        unlinkSync(tempPath);
-      } catch {
-        // best effort; surface the original error below
+      if (!renamed) {
+        try {
+          unlinkSync(tempPath);
+        } catch {
+          // best effort; surface the original error below
+        }
       }
       throw error;
     }
@@ -620,7 +695,12 @@ export class ThoughtStorage {
   // to when they were saved. Used to decide whether an operation produced an
   // actual change in stored content (vs. a timestamp-only rewrite).
   private contentFingerprintFor(session: SessionInfo, thoughts: ThoughtData[]): string {
-    return this.fingerprintFor(session, thoughts, null);
+    const payload = {
+      schemaVersion: SCHEMA_VERSION,
+      sessionId: session.sessionId,
+      thoughts: thoughts.map((thought) => thoughtToDict(thought, true)),
+    };
+    return createHash("sha256").update(JSON.stringify(payload)).digest("hex");
   }
 
   private toHistoryThought(thought: ThoughtData, includeFullThoughts: boolean): HistoryThoughtItem {
@@ -668,8 +748,7 @@ export class ThoughtStorage {
     } catch (error) {
       // EACCES / EMFILE on the sessions directory must not crash status.
       // Surface the failure as a partial-enumeration reason.
-      const message = error instanceof Error ? error.message : String(error);
-      return { ids: [], overflowed: true, error: message };
+      return { ids: [], overflowed: true, error: this.diagnosticForError(error) };
     }
     try {
       for (let entry = dir.readSync(); entry !== null; entry = dir.readSync()) {
@@ -778,6 +857,38 @@ export class ThoughtStorage {
     return { value: `<absolute:${basename(filePath)}>`, disclosure: "absolute_diagnostic" };
   }
 
+  private diagnosticForError(error: unknown): string {
+    if (error instanceof Error) {
+      const code = "code" in error && typeof error.code === "string" ? error.code : error.name;
+      return code
+        ? `${code}: ${error.message.replaceAll(resolve(this.storageDir), this.redactPath(this.storageDir).value)}`
+        : error.message;
+    }
+    return String(error);
+  }
+
+  private isErrorCode(error: unknown, code: string): boolean {
+    return error instanceof Error && "code" in error && error.code === code;
+  }
+
+  private removeStaleSessionLock(lockPath: string): boolean {
+    try {
+      const stats = statSync(lockPath);
+      if (Date.now() - stats.mtimeMs < SESSION_LOCK_STALE_MS) {
+        return false;
+      }
+      unlinkSync(lockPath);
+      console.warn(`[pi-sequential-thinking] Removed stale session lock ${this.redactPath(lockPath).value}`);
+      return true;
+    } catch (error) {
+      return this.isErrorCode(error, "ENOENT");
+    }
+  }
+
+  private sleep(milliseconds: number): void {
+    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, milliseconds);
+  }
+
   // =============================================================================
   // Filesystem utilities
   // =============================================================================
@@ -807,11 +918,17 @@ export class ThoughtStorage {
     if (explicitImport && stats.isSymbolicLink()) {
       throw new Error(`Cannot import symlink: ${this.redactPath(filePath).value}`);
     }
+    if (!stats.isFile()) {
+      throw new Error(`Cannot import special file: ${this.redactPath(filePath).value}`);
+    }
   }
 
   private ensureDirectory(dir: string): void {
+    const existed = existsSync(dir);
     mkdirSync(dir, { recursive: true, mode: 0o700 });
-    this.restrictDirectoryPermissions(dir);
+    if (!existed) {
+      this.restrictDirectoryPermissions(dir);
+    }
   }
 
   private restrictDirectoryPermissions(dir: string): void {
@@ -841,9 +958,9 @@ export class ThoughtStorage {
     }
   }
 
-  private backupCorruptedFile(filePath: string): void {
+  private backupCorruptedFile(filePath: string): boolean {
     if (!existsSync(filePath)) {
-      return;
+      return true;
     }
 
     const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
@@ -852,8 +969,12 @@ export class ThoughtStorage {
     try {
       renameSync(filePath, backupPath);
       console.warn(`[pi-sequential-thinking] Backed up corrupted file to ${this.redactPath(backupPath).value}`);
-    } catch {
-      console.warn(`[pi-sequential-thinking] Could not backup corrupted file ${this.redactPath(filePath).value}`);
+      return true;
+    } catch (error) {
+      console.warn(
+        `[pi-sequential-thinking] Could not backup corrupted file ${this.redactPath(filePath).value}: ${this.diagnosticForError(error)}`,
+      );
+      return false;
     }
   }
 }

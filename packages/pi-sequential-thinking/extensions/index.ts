@@ -67,7 +67,8 @@ export default function sequentialThinking(pi: ExtensionAPI): void {
       const config = getEffectiveConfig();
       return {
         ...config,
-        storageDir: config.storageDir ?? join(getHomeDir(), ".mcp_sequential_thinking"),
+        storageDir: initialConfig.storageDir ?? join(getHomeDir(), ".mcp_sequential_thinking"),
+        sources: { ...config.sources, storageDir: initialConfig.sources.storageDir },
       };
     },
   });

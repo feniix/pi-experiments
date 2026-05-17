@@ -90,6 +90,12 @@ test("extension registers source-compatible tools, schemas, and flags", () => {
   assert.deepEqual(importParams.required, ["file_path"]);
   assert.equal(importParams.properties?.file_path?.description, "Path to the JSON file to import.");
   assert.equal(importParams.properties?.file_path?.type, "string");
+
+  const stageSchema = JSON.stringify((processParams as { properties?: { stage?: unknown } }).properties?.stage);
+  assert.match(stageSchema, /case-insensitive/);
+  for (const stage of ["Problem Definition", "Research", "Analysis", "Synthesis", "Conclusion"]) {
+    assert.match(stageSchema, new RegExp(stage));
+  }
 });
 
 test("pi runtime preserves named sessions, receipts, history, import/export, and sequential_think", async () => {
@@ -234,4 +240,45 @@ test("pi runtime returns structured validation errors", async () => {
   assert.deepEqual(conflictingHistory.details.validationErrors, [
     { field: "include_full_thoughts", message: "Conflicting aliases for include_full_thoughts" },
   ]);
+});
+
+test("pi extension honors config-file aliases and max output flags", async () => {
+  const baseDir = mkdtempSync(join(tmpdir(), "pi-seq-runtime-config-"));
+  const configuredStorageDir = join(baseDir, "configured-storage");
+  const configPath = join(baseDir, "seq-config.json");
+  writeFileSync(
+    configPath,
+    JSON.stringify({ storageDir: configuredStorageDir, maxBytes: 9999, maxLines: 9999 }),
+    "utf-8",
+  );
+  const mockPi = createMockPi({
+    "--seq-think-config": configPath,
+    "--seq-think-max-bytes": "1000",
+    "--seq-think-max-lines": "50",
+  });
+  const originalWarn = console.warn;
+  const warnings: string[] = [];
+  console.warn = (message?: unknown) => {
+    warnings.push(String(message));
+  };
+  try {
+    sequentialThinking(mockPi as unknown as ExtensionAPI);
+  } finally {
+    console.warn = originalWarn;
+  }
+
+  assert.ok(warnings.some((message) => message.includes("--seq-think-config is deprecated")));
+  const status = parseToolJson(await getTool(mockPi, "get_thinking_status").execute("call-config-1", {}));
+  assert.equal(status.effectiveConfig.sources.storageDir, "config_file");
+  assert.equal(status.effectiveConfig.sources.maxBytes, "flag");
+  assert.equal(status.effectiveConfig.sources.maxLines, "flag");
+
+  const sequential = await getTool(mockPi, "sequential_think").execute("call-config-2", {
+    topic: "A long topic that should make the JSON response exceed configured pi output limits",
+    num_thoughts: 5,
+    piMaxBytes: 120,
+    piMaxLines: 2,
+  });
+  assert.equal(sequential.details.truncated, true);
+  assert.match(sequential.content[0].text, /Output truncated/);
 });

@@ -68,6 +68,7 @@ test("registerSequentialThinkingPiTools maps portable tools to source-compatible
   assert.equal(result.isError, false);
   assert.equal(result.content[0].type, "text");
   assert.equal(result.details.tool, "process_thought");
+  assert.equal((result.details.result as { receipt?: { operation?: unknown } }).receipt?.operation, "process_thought");
 
   const invalid = await processTool.execute(
     "call-2",
@@ -86,6 +87,31 @@ test("registerSequentialThinkingPiTools maps portable tools to source-compatible
   assert.match(invalid.content[0].text, /Sequential Thinking error/);
   assert.deepEqual(invalid.details.validationErrors, [
     { field: "thought", message: "Thought content cannot be empty" },
+  ]);
+
+  const invalidStage = await processTool.execute("call-3", {
+    thought: "Invalid stage",
+    thought_number: 1,
+    total_thoughts: 1,
+    next_thought_needed: false,
+    stage: "Nope",
+  });
+  assert.equal(invalidStage.isError, true);
+  assert.deepEqual(
+    (invalidStage.details.validationErrors as Array<{ field: string }>).map((error) => error.field),
+    ["stage"],
+  );
+  assert.match(JSON.stringify(invalidStage.details.validationErrors), /Invalid thinking stage/);
+
+  const sequentialTool = registered.find((tool) => tool.name === "sequential_think");
+  assert.ok(sequentialTool);
+  const fractionalSequential = await sequentialTool.execute("call-4", {
+    topic: "fractional",
+    num_thoughts: 3.5,
+  });
+  assert.equal(fractionalSequential.isError, true);
+  assert.deepEqual(fractionalSequential.details.validationErrors, [
+    { field: "num_thoughts", message: "num_thoughts must be an integer" },
   ]);
 });
 

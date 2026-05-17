@@ -3,6 +3,7 @@ import { definePortableTool, type PortableTool, type PortableToolResult } from "
 import { type TObject, Type } from "typebox";
 import { ThoughtAnalyzer } from "./analyzer.js";
 import {
+  type EffectiveConfigStatus,
   getHomeDir,
   loadConfigWithSources,
   normalizeNumber,
@@ -11,7 +12,6 @@ import {
 } from "./config.js";
 import { formatToolOutput, resolveEffectiveLimits, type SequentialThinkingToolDetails, splitParams } from "./output.js";
 import {
-  type EffectiveConfigStatus,
   type ExportSessionResult,
   type ImportSessionResult,
   type SessionOperationResult,
@@ -20,8 +20,9 @@ import {
 import {
   DEFAULT_HISTORY_LIMIT,
   generateUuid,
-  normalizeSessionId,
+  normalizeSessionFromArgs,
   normalizeThoughtInput,
+  THOUGHT_STAGES,
   type ThoughtData,
   ThoughtStage,
   ThoughtValidationError,
@@ -50,6 +51,9 @@ const outputLimitParams = {
 };
 
 const stringArray = (description: string) => Type.Array(Type.String(), { description });
+const requireOneOfAliases = (field: string, alias: string) => ({
+  anyOf: [{ required: [field] }, { required: [alias] }],
+});
 
 export const processThoughtParams = Type.Object(
   {
@@ -93,7 +97,7 @@ export const processThoughtParams = Type.Object(
     ),
     stage: Type.String({
       description:
-        "The thinking stage. Runtime normalization accepts the source stages case-insensitively: Problem Definition, Research, Analysis, Synthesis, Conclusion.",
+        "The thinking stage. Valid values are Problem Definition, Research, Analysis, Synthesis, Conclusion; matching is case-insensitive at runtime.",
     }),
     tags: Type.Optional(stringArray("Keywords or categories for your thought.")),
     axioms_used: Type.Optional(stringArray("Principles or axioms applied in your thought.")),
@@ -103,7 +107,14 @@ export const processThoughtParams = Type.Object(
     ...sessionParams,
     ...outputLimitParams,
   },
-  { additionalProperties: true },
+  {
+    additionalProperties: true,
+    allOf: [
+      requireOneOfAliases("thought_number", "thoughtNumber"),
+      requireOneOfAliases("total_thoughts", "totalThoughts"),
+      requireOneOfAliases("next_thought_needed", "nextThoughtNeeded"),
+    ],
+  },
 );
 
 export const sessionScopedParams = Type.Object(
@@ -149,27 +160,17 @@ export const sequentialThinkParams = Type.Object(
   {
     topic: Type.String({ description: "The topic or question to think through." }),
     num_thoughts: Type.Optional(
-      Type.Integer({ minimum: 3, maximum: 10, description: "Number of thoughts to generate (default: 5)." }),
+      Type.Integer({
+        minimum: 3,
+        maximum: 10,
+        description: "Number of thoughts requested, 3–10; generates up to 5 canonical stages.",
+      }),
     ),
     ...sessionParams,
     ...outputLimitParams,
   },
   { additionalProperties: true },
 );
-
-function sessionIdFromArgs(args: Record<string, unknown>): string | null {
-  const snake = args.session_id;
-  const camel = args.sessionId;
-  if (snake !== undefined && camel !== undefined) {
-    const snakeSession = normalizeSessionId(snake);
-    const camelSession = normalizeSessionId(camel);
-    if (snakeSession.sessionId !== camelSession.sessionId) {
-      throw new ThoughtValidationError([{ field: "session_id", message: "Conflicting aliases for session_id" }]);
-    }
-    return snakeSession.sessionId;
-  }
-  return normalizeSessionId(snake ?? camel).sessionId;
-}
 
 function includeFullThoughtsFromArgs(args: Record<string, unknown>): boolean {
   const snake = args.include_full_thoughts;
@@ -231,7 +232,18 @@ function formatResult(
   const { requestedLimits } = splitParams(params);
   const effectiveLimits = resolveEffectiveLimits(requestedLimits, getMaxLimits());
   const { text, details } = formatToolOutput(toolName, result, effectiveLimits);
-  return { text, structuredContent: details as unknown as Record<string, unknown>, isError: false };
+  const structuredResult = details.truncated
+    ? {
+        omitted: true,
+        reason: "Output exceeded configured limits; read text/tempFile or request a smaller page.",
+        tempFile: details.tempFile,
+      }
+    : result;
+  return {
+    text,
+    structuredContent: { ...(details as unknown as Record<string, unknown>), result: structuredResult },
+    isError: false,
+  };
 }
 
 function formatError(toolName: string, error: unknown): PortableToolResult {
@@ -268,8 +280,9 @@ function executeSequentialTool(
 export function createSequentialThinkingTools(
   options: CreateSequentialThinkingToolsOptions = {},
 ): readonly SequentialThinkingPortableTool[] {
-  const config = resolveEffectiveConfig({ config: loadConfigWithSources(undefined) });
-  const storage = options.storage ?? new ThoughtStorage(config.storageDir);
+  const storage =
+    options.storage ??
+    new ThoughtStorage(resolveEffectiveConfig({ config: loadConfigWithSources(undefined) }).storageDir);
   const analyzer = options.analyzer ?? new ThoughtAnalyzer();
   const getMaxLimits =
     options.getMaxLimits ??
@@ -301,15 +314,14 @@ export function createSequentialThinkingTools(
   }
 
   function generateSummary(args: Record<string, unknown>) {
-    const sessionId = sessionIdFromArgs(args);
-    const session = normalizeSessionId(sessionId);
+    const session = normalizeSessionFromArgs(args);
     const thoughts = storage.getAllThoughts(session.sessionId);
     return { sessionId: session.sessionId, sessionLabel: session.sessionLabel, ...analyzer.generateSummary(thoughts) };
   }
 
   function clearHistory(args: Record<string, unknown>) {
-    const sessionId = sessionIdFromArgs(args);
-    const result = storage.clearHistory(sessionId);
+    const session = normalizeSessionFromArgs(args);
+    const result = storage.clearHistory(session.sessionId);
     return { status: "success", message: "Thought history cleared", receipt: toReceipt("clear_history", result) };
   }
 
@@ -318,8 +330,8 @@ export function createSequentialThinkingTools(
     if (!filePath) {
       throw new ThoughtValidationError([{ field: "file_path", message: "file_path is required" }]);
     }
-    const sessionId = sessionIdFromArgs(args);
-    const result = storage.exportSession(filePath, sessionId);
+    const session = normalizeSessionFromArgs(args);
+    const result = storage.exportSession(filePath, session.sessionId);
     return {
       status: "success",
       message: `Session exported to ${result.filePath}`,
@@ -332,8 +344,8 @@ export function createSequentialThinkingTools(
     if (!filePath) {
       throw new ThoughtValidationError([{ field: "file_path", message: "file_path is required" }]);
     }
-    const sessionId = sessionIdFromArgs(args);
-    const result = storage.importSession(filePath, sessionId);
+    const session = normalizeSessionFromArgs(args);
+    const result = storage.importSession(filePath, session.sessionId);
     return {
       status: "success",
       message: `Session imported from ${filePath}`,
@@ -342,10 +354,10 @@ export function createSequentialThinkingTools(
   }
 
   function getThinkingHistory(args: Record<string, unknown>) {
-    const sessionId = sessionIdFromArgs(args);
+    const session = normalizeSessionFromArgs(args);
     const includeFullThoughts = includeFullThoughtsFromArgs(args);
     return storage.getHistory({
-      sessionId,
+      sessionId: session.sessionId,
       limit: normalizeNumber(args.limit) ?? DEFAULT_HISTORY_LIMIT,
       offset: normalizeNumber(args.offset) ?? 0,
       includeFullThoughts,
@@ -362,18 +374,13 @@ export function createSequentialThinkingTools(
       throw new ThoughtValidationError([{ field: "topic", message: "topic cannot be empty" }]);
     }
     const requestedThoughts = normalizeNumber(args.num_thoughts) ?? 5;
+    if (!Number.isInteger(requestedThoughts)) {
+      throw new ThoughtValidationError([{ field: "num_thoughts", message: "num_thoughts must be an integer" }]);
+    }
     const numThoughts = Math.min(Math.max(requestedThoughts, 3), 10);
-    const sessionId = sessionIdFromArgs(args);
-    const session = normalizeSessionId(sessionId);
-    const preCount = storage.getAllThoughts(session.sessionId).length;
+    const session = normalizeSessionFromArgs(args);
 
-    const stages: ThoughtStage[] = [
-      ThoughtStage.PROBLEM_DEFINITION,
-      ThoughtStage.RESEARCH,
-      ThoughtStage.ANALYSIS,
-      ThoughtStage.SYNTHESIS,
-      ThoughtStage.CONCLUSION,
-    ];
+    const stages: readonly ThoughtStage[] = THOUGHT_STAGES;
 
     const stagePrompts: Record<ThoughtStage, string> = {
       [ThoughtStage.PROBLEM_DEFINITION]: `Define the problem: What exactly needs to be decided or solved regarding "${topic}"? What are the constraints and success criteria?`,
@@ -383,11 +390,11 @@ export function createSequentialThinkingTools(
       [ThoughtStage.CONCLUSION]: `Draw a conclusion about "${topic}": What is the recommendation? What is the final verdict?`,
     };
 
-    let lastResult: SessionOperationResult | undefined;
     const thoughtCount = Math.min(numThoughts, stages.length);
+    const generatedThoughts: ThoughtData[] = [];
     for (let i = 0; i < thoughtCount; i += 1) {
       const stage = stages[i];
-      const thoughtData: ThoughtData = {
+      generatedThoughts.push({
         thought: stagePrompts[stage],
         thought_number: i + 1,
         total_thoughts: thoughtCount,
@@ -398,27 +405,18 @@ export function createSequentialThinkingTools(
         assumptions_challenged: [],
         timestamp: new Date().toISOString(),
         id: generateUuid(),
-      };
-      lastResult = storage.addThought(thoughtData, session.sessionId);
+      });
     }
 
+    const lastResult = storage.addThoughts(generatedThoughts, session.sessionId);
     const thoughts = storage.getAllThoughts(session.sessionId);
     const summary = analyzer.generateSummary(thoughts);
-    const fallbackResult: SessionOperationResult = {
-      sessionId: session.sessionId,
-      sessionLabel: session.sessionLabel,
-      preCount,
-      postCount: thoughts.length,
-      changed: thoughts.length !== preCount,
-      savedAt: new Date().toISOString(),
-      stateFingerprint: lastResult?.stateFingerprint ?? "",
-    };
 
     return {
       sessionId: session.sessionId,
       sessionLabel: session.sessionLabel,
       ...summary,
-      receipt: toReceipt("sequential_think", lastResult ? { ...lastResult, preCount } : fallbackResult),
+      receipt: toReceipt("sequential_think", lastResult),
     };
   }
 

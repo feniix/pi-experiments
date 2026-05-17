@@ -3,10 +3,10 @@ import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
-import { createMcpServer } from "@feniix/pi-portable-tools/mcp";
+
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
-import { createMcpSequentialThinkingTools } from "./mcp-server.js";
+import { createMcpSequentialThinkingServer } from "./mcp-server.js";
 
 function textFromContent(content: unknown): string {
   assert.ok(Array.isArray(content), "tool result content must be an array");
@@ -26,11 +26,12 @@ test("MCP serves all sequential-thinking tools with source-compatible behavior",
   const storageDir = mkdtempSync(join(tmpdir(), "pi-seq-mcp-"));
   const exportPath = join(storageDir, "nested", "session.json");
   const legacyPath = join(storageDir, "legacy.json");
-  const tools = createMcpSequentialThinkingTools({
+  const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+  const server = createMcpSequentialThinkingServer({
+    name: "pi-sequential-thinking-test",
+    version: "0.1.0",
     env: { MCP_STORAGE_DIR: storageDir, SEQ_THINK_MAX_BYTES: "51200", SEQ_THINK_MAX_LINES: "2000" },
   });
-  const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
-  const server = createMcpServer({ name: "pi-sequential-thinking-test", version: "0.1.0", tools });
   const client = new Client({ name: "pi-sequential-thinking-test-client", version: "0.1.0" });
 
   await Promise.all([server.connect(serverTransport), client.connect(clientTransport)]);
@@ -49,6 +50,10 @@ test("MCP serves all sequential-thinking tools with source-compatible behavior",
         "sequential_think",
       ],
     );
+    const processOutputSchema = list.tools.find((tool) => tool.name === "process_thought")?.outputSchema as
+      | { properties?: { tool?: { type?: unknown } } }
+      | undefined;
+    assert.equal(processOutputSchema?.properties?.tool?.type, "string");
 
     const processResult = await client.callTool({
       name: "process_thought",
@@ -133,6 +138,25 @@ test("MCP serves all sequential-thinking tools with source-compatible behavior",
     });
     assert.equal(invalid.isError, true);
     assert.match(textFromContent(invalid.content), /Thought content cannot be empty/);
+
+    const invalidStage = await client.callTool({
+      name: "process_thought",
+      arguments: {
+        thought: "Invalid stage",
+        thought_number: 1,
+        total_thoughts: 1,
+        next_thought_needed: false,
+        stage: "Nope",
+      },
+    });
+    assert.equal(invalidStage.isError, true);
+    const invalidStageBody = invalidStage.structuredContent as {
+      tool?: unknown;
+      validationErrors?: Array<{ field?: unknown; message?: unknown }>;
+    };
+    assert.equal(invalidStageBody.tool, "process_thought");
+    assert.equal(invalidStageBody.validationErrors?.[0]?.field, "stage");
+    assert.match(String(invalidStageBody.validationErrors?.[0]?.message), /Invalid thinking stage/);
   } finally {
     await client.close();
     await server.close();
@@ -148,9 +172,12 @@ test("MCP startup honors source-compatible config file wiring", async () => {
     JSON.stringify({ storageDir: configuredStorageDir, maxBytes: 1000, maxLines: 50 }),
     "utf-8",
   );
-  const tools = createMcpSequentialThinkingTools({ env: { SEQ_THINK_CONFIG_FILE: configPath } });
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
-  const server = createMcpServer({ name: "pi-sequential-thinking-config-test", version: "0.1.0", tools });
+  const server = createMcpSequentialThinkingServer({
+    name: "pi-sequential-thinking-config-test",
+    version: "0.1.0",
+    env: { SEQ_THINK_CONFIG_FILE: configPath },
+  });
   const client = new Client({ name: "pi-sequential-thinking-config-test-client", version: "0.1.0" });
 
   await Promise.all([server.connect(serverTransport), client.connect(clientTransport)]);

@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import {
+  chmodSync,
   existsSync,
   lstatSync,
   mkdirSync,
@@ -8,6 +9,7 @@ import {
   rmSync,
   statSync,
   symlinkSync,
+  utimesSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -247,4 +249,115 @@ test("reports corrupt named sessions as incomplete without backing them up", () 
     false,
   );
   assert.ok(status.sessions.some((session) => session.sessionId === "corrupt" && session.corrupt === true));
+});
+
+test("constructor keeps status available when storage directory cannot be created", () => {
+  const blockerPath = join(tempDir, "not-a-directory");
+  writeFileSync(blockerPath, "blocker", "utf-8");
+
+  const storage = new ThoughtStorage(join(blockerPath, "child"));
+  const status = storage.getStatus();
+
+  assert.equal(status.writable, false);
+  assert.equal(status.statusCompleteness.complete, false);
+  assert.match(status.statusCompleteness.reason ?? "", /Storage initialization failed/);
+  assert.throws(() => storage.addThought(createThought()), /ENOTDIR|not a directory/i);
+});
+
+if (process.platform !== "win32") {
+  test("does not chmod existing export directories", () => {
+    const storage = new ThoughtStorage(join(tempDir, "storage"));
+    storage.addThought(createThought());
+    const exportDir = join(tempDir, "shared-export");
+    mkdirSync(exportDir, { recursive: true, mode: 0o755 });
+    chmodSync(exportDir, 0o755);
+
+    storage.exportSession(join(exportDir, "session.json"));
+
+    assert.equal(statSync(exportDir).mode & 0o777, 0o755);
+  });
+}
+
+test("backs up malformed parseable active sessions without overwriting them", () => {
+  const sessionFile = join(tempDir, "current_session.json");
+  writeFileSync(sessionFile, JSON.stringify({ schemaVersion: 1, thoughts: "not an array" }), "utf-8");
+
+  const storage = new ThoughtStorage(tempDir);
+
+  assert.deepEqual(storage.getAllThoughts(), []);
+  assert.equal(existsSync(sessionFile), false);
+  assert.equal(
+    storage.getStatus().backupFiles.some((file) => file.startsWith("current_session.json.bak.")),
+    true,
+  );
+});
+
+test("getHistory reports corrupt sessions without mutating the active file", () => {
+  const storage = new ThoughtStorage(tempDir);
+  storage.addThought(createThought());
+  const sessionFile = join(tempDir, "current_session.json");
+  writeFileSync(sessionFile, "not valid json", "utf-8");
+
+  assert.throws(() => storage.getHistory(), /Invalid session file/);
+  assert.equal(existsSync(sessionFile), true);
+  assert.equal(
+    storage.getStatus().backupFiles.some((file) => file.startsWith("current_session.json.bak.")),
+    false,
+  );
+});
+
+test("import receipts detect identical and edited thought content", () => {
+  const storage = new ThoughtStorage(tempDir);
+  const importPath = join(tempDir, "import.json");
+  const originalThought = createThought({ thought: "Original", tags: ["original"] });
+  writeFileSync(
+    importPath,
+    JSON.stringify({ schemaVersion: 1, sessionId: "review", thoughts: [originalThought] }),
+    "utf-8",
+  );
+
+  assert.equal(storage.importSession(importPath, "review").changed, true);
+  assert.equal(storage.importSession(importPath, "review").changed, false);
+
+  writeFileSync(
+    importPath,
+    JSON.stringify({ schemaVersion: 1, sessionId: "review", thoughts: [{ ...originalThought, thought: "Edited" }] }),
+    "utf-8",
+  );
+  assert.equal(storage.importSession(importPath, "review").changed, true);
+  assert.equal(storage.getAllThoughts("review")[0].thought, "Edited");
+});
+
+test("rejects oversized session writes before replacing existing history", () => {
+  const storage = new ThoughtStorage(tempDir);
+  storage.addThought(createThought({ thought: "Small" }));
+  assert.throws(
+    () => storage.addThought(createThought({ id: "huge", thought: "x".repeat(MAX_IMPORT_BYTES + 1) })),
+    /10 MiB/,
+  );
+
+  assert.deepEqual(
+    storage.getAllThoughts().map((thought) => thought.thought),
+    ["Small"],
+  );
+});
+
+if (process.platform !== "win32") {
+  test("rejects special import files before reading them", () => {
+    const storage = new ThoughtStorage(tempDir);
+    assert.throws(() => storage.importSession("/dev/null"), /special file/);
+  });
+}
+
+test("recovers stale session locks before writing", () => {
+  const storage = new ThoughtStorage(tempDir);
+  const lockPath = join(tempDir, "current_session.json.lock");
+  writeFileSync(lockPath, JSON.stringify({ pid: 0, createdAt: "1970-01-01T00:00:00.000Z" }), "utf-8");
+  const staleDate = new Date(Date.now() - 60_000);
+  utimesSync(lockPath, staleDate, staleDate);
+
+  storage.addThought(createThought({ thought: "Recovered" }));
+
+  assert.equal(existsSync(lockPath), false);
+  assert.equal(storage.getAllThoughts()[0].thought, "Recovered");
 });
