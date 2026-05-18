@@ -182,16 +182,16 @@ This gap matters because `packages/pi-sequential-thinking` has package-local pi/
 
 ## Risks and Mitigations
 
-- **Risk:** Over-normalization could hide real host drift.  
+- **Risk:** Over-normalization could hide real host drift.
   **Mitigation:** Normalize only known volatile keys and paths; compare full remaining payloads; include normalization self-check fixtures that must fail when semantic fields differ.
 
-- **Risk:** MCP stderr warnings from corrupt-file or storage setup obscure failures.  
+- **Risk:** MCP stderr warnings from corrupt-file or storage setup obscure failures.
   **Mitigation:** Capture stderr and print it only on failure, following existing smoke scripts.
 
-- **Risk:** Stateful operations diverge because both hosts accidentally share storage.  
+- **Risk:** Stateful operations diverge because both hosts accidentally share storage.
   **Mitigation:** Use separate temp dirs and write equivalent import/export paths for each host.
 
-- **Risk:** Raw JSON text differs while structured payloads match, or vice versa.  
+- **Risk:** Raw JSON text differs while structured payloads match, or vice versa.
   **Mitigation:** Parse text JSON and also compare normalized structured payloads/details for every case, listing any intentionally volatile fields in the normalization contract.
 
 ---
