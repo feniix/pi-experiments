@@ -44,11 +44,11 @@ Graduate `@feniix/bridgekit` from the `pi-experiments` incubator by copying/extr
 
 * Do not remove, archive, or stop building `packages/bridgekit` from `pi-experiments` in this phase.
 
-* Do not transition `pi-text-utils` or `pi-sequential-thinking` to use BridgeKit from the new repo in this phase.
+* Do not transition `pi-text-utils` or `pi-sequential-thinking` to use BridgeKit from the new repo in this phase. Existing fixture smoke scripts may be read as examples only; do not edit, reconfigure, or rewire fixture packages as part of this implementation.
 
 * Do not publish BridgeKit to npm in this work.
 
-* Do not add GitHub Actions CI or trusted-publishing workflows in this work; document them as the next operational step.
+* Do not add GitHub Actions CI or trusted-publishing workflows in this work; document them as the next operational step. Do not create `.github/workflows/*`, GitHub environment settings, npm trusted-publisher configuration, release automation, tags, releases, or automation credentials in this phase.
 
 * Do not change BridgeKit's API or runtime semantics beyond the Node engine floor update to `>=22.19.0` during this extraction phase.
 
@@ -57,6 +57,8 @@ Graduate `@feniix/bridgekit` from the `pi-experiments` incubator by copying/extr
 * Do not perform the MCP SDK v2 migration in this plan. Defer that migration until MCP SDK v2 is no longer alpha/stabilizes enough to be treated as a production dependency.
 
 * Do not rely on `workspace:` or `file:` dependency ranges in publishable package manifests.
+
+* Implementation must not edit, stage, commit, tag, or push from the `pi-experiments` working checkout. All history rewriting happens only in a fresh disposable clone; the source checkout is used for read-only inspection plus before/after `git status --short` checks.
 
 ### Deferred to Follow-Up Work
 
@@ -175,6 +177,7 @@ Expected standalone `bridgekit` repo shape:
 ```text
 bridgekit/
   docs/
+    extraction.md
     releasing.md
   examples/
     README.md
@@ -315,23 +318,41 @@ flowchart TB
 
 * Create in `bridgekit`: `src/adapters/mcp.typecheck.ts`
 
+* Create in `bridgekit`: `docs/extraction.md`
+
 * Create in `bridgekit`: `LICENSE` *(if the standalone repo needs a license file matching package metadata)*
 
 **Approach:**
 
-* Start from a dedicated extraction clone or worktree, not the user's working `pi-experiments` checkout.
+* Start from a fresh disposable clone, not the user's working `pi-experiments` checkout and not a linked git worktree. Do not run history-rewriting tools in the source checkout or a linked worktree.
 
-* Run a source preflight before extraction: record the exact source commit SHA, confirm the current BridgeKit dependency/lockfile baseline, and confirm the source repo has no unexpected working-tree changes.
+* Run a source preflight before extraction: record the exact source commit SHA, confirm the current BridgeKit dependency/lockfile baseline, confirm `@modelcontextprotocol/sdk` remains on major version 1, and confirm the source repo has no unexpected working-tree changes. Extract from a detached checkout at that recorded SHA in the fresh disposable clone so later `pi-experiments` commits cannot drift into the standalone baseline.
 
-* Preserve history across both `packages/bridgekit` and the pre-rename `packages/pi-portable-tools` path so prior portable-tool commits remain visible in the standalone repo.
+* Verify the target remote is truly empty before any push using `git ls-remote --heads --tags https://github.com/feniix/bridgekit.git`. Expected output is no refs. If any branch or tag exists, keep extraction local and stop for an explicit push strategy; do not merge unrelated histories or force-push by default. After filtering and verification, confirm no remaining `origin` remote points at `pi-experiments`, add the target as `bridgekit-target`, push explicitly with `git push bridgekit-target HEAD:refs/heads/main`, and verify remote `main` points to local `HEAD`. Do not use `--force` unless a separate explicit strategy is approved.
 
-* Move package-local files to the standalone repo root and strip the historical package path prefixes from internal references.
+* Preserve history across both `packages/bridgekit` and the pre-rename `packages/pi-portable-tools` path so prior portable-tool commits remain visible in the standalone repo. Use a disposable clone and `git filter-repo` or equivalent with both paths (`packages/pi-portable-tools/` and `packages/bridgekit/`) rewritten to the repo root. The intended procedure is:
+
+```sh
+SRC_SHA="$(git -C /path/to/pi-experiments rev-parse HEAD)"
+git clone --no-local /path/to/pi-experiments /tmp/bridgekit-extract
+cd /tmp/bridgekit-extract
+git checkout --detach "$SRC_SHA"
+git filter-repo --force \
+  --path packages/pi-portable-tools/ \
+  --path packages/bridgekit/ \
+  --path-rename packages/pi-portable-tools/: \
+  --path-rename packages/bridgekit/:
+```
+
+If `git filter-repo` or an equivalent history-rewrite tool is unavailable, stop and install/choose one rather than falling back to a history-free copy. After filtering, verify `package.json`, `src/`, `README.md`, `examples/`, and `llms.txt` exist at repo root and no `packages/` directory remains.
+
+* Move package-local files to the standalone repo root and strip the historical package path prefixes from internal references. Verify root files exist directly at repo root (`src/`, `README.md`, `package.json`, `examples/`, `llms.txt`) rather than nested under `packages/*`.
 
 * Preserve public entrypoint files and adapter/core boundaries exactly; do not change MCP adapter dependency strategy during extraction.
 
 * Set `engines.node` to `>=22.19.0` and update docs that mention the runtime floor.
 
-* Add standalone dev tooling to `package.json`: TypeScript, Biome, Node types, lint, typecheck, build, test, prepack, pack dry-run, and package-smoke scripts.
+* Add standalone dev tooling to `package.json`: `typescript`, `@types/node`, `@biomejs/biome`, lint, typecheck, build, test, prepack, pack dry-run, and package-smoke scripts. Keep runtime dependencies limited to BridgeKit runtime needs (`@modelcontextprotocol/sdk` v1 and `typebox`). Allowed scripts are local verification only: `clean`, `lint`, `lint:fix`, `check`, `typecheck`, `build`, `test`, `verify:dist`, `pack:dry-run`, `package-smoke`, and `prepack`. Do not add `release`, `publish`, `semantic-release`, provenance, changelog-generation, or registry-publishing scripts.
 
 * Rewrite `biome.json` around standalone paths: `src/**/*.ts`, `scripts/**/*.mjs`, `package.json`, `tsconfig.json`, `tsconfig.base.json`, and `biome.json`.
 
@@ -339,9 +360,9 @@ flowchart TB
 
 * Add standalone package metadata for `repository`, `bugs`, and `homepage` using `https://github.com/feniix/bridgekit.git`.
 
-* Verify history before pushing to the standalone default branch: sample known commits from both `packages/pi-portable-tools` and `packages/bridgekit` history should appear with author/date metadata intact.
+* Verify history before any push to the standalone default branch: sample known commits from both `packages/pi-portable-tools` and `packages/bridgekit` history should be traceable with subject/author/date/content intact, including commits corresponding to original source SHAs `c2ffbab` and `72d4701`. Exact commit hashes are expected to change during path rewriting. If the rename commit becomes empty and is pruned because old/new paths collapse to the same root, record that in `docs/extraction.md`. Implementation may remain local or on a non-release branch until validation passes; do not create tags or releases.
 
-* Do not modify `pi-experiments` in this unit; run a post-extraction source-repo status check to prove it stayed unchanged.
+* Do not modify `pi-experiments` in this unit; record `git status --short` for `pi-experiments` before and after extraction with expected empty output.
 
 **Execution note:** Characterization-first. Capture current public exports from the incubator package before extraction, then prove the standalone repo exposes the same runtime API and declarations after the move.
 
@@ -371,9 +392,11 @@ flowchart TB
 
 * History path: the standalone repo retains meaningful `packages/pi-portable-tools` and `packages/bridgekit` commit history rather than starting from a single squashed copy commit.
 
-* History path: known commits such as `c2ffbab feat(portable-tools): add core sdk package` and `72d4701 chore: rename portable tool SDK to BridgeKit` are present in the extracted history.
+* History path: commits corresponding to original source SHAs `c2ffbab feat(portable-tools): add core sdk package` and `72d4701 chore: rename portable tool SDK to BridgeKit` are traceable by subject/author/date/content in extracted history; exact rewritten hashes may differ, and an empty/pruned rename commit is documented if applicable.
 
-* Source safety path: source commit SHA and current dependency baseline are recorded, and `pi-experiments` has no unexpected working-tree changes before or after extraction.
+* Source safety path: source commit SHA and current dependency baseline are recorded in `docs/extraction.md`, extraction runs from that recorded SHA, and `pi-experiments` has no unexpected working-tree changes before or after extraction.
+
+* Remote safety path: target remote preflight shows no heads or tags before any push; if refs exist, extraction remains local until a push strategy is explicitly chosen.
 
 * Edge case: unsupported deep imports from `src/` or `dist/` are not documented or required by standalone examples.
 
@@ -383,9 +406,11 @@ flowchart TB
 
 * The standalone repo can install dependencies from its own `package-lock.json` and compile BridgeKit without reading `pi-experiments`.
 
+* The standalone `package-lock.json` preserves the current MCP SDK v1 baseline: resolved `@modelcontextprotocol/sdk` major version is `1` (prefer exactly the current lock resolution unless an intentional non-v2 lock refresh is documented), and no MCP SDK v2 alpha/beta/canary package is introduced.
+
 * Public API snapshots match the source package contract except for the intentional Node engine floor update if that update was not already present.
 
-* History checks demonstrate pre-rename portable-tool commits survived extraction.
+* History checks demonstrate pre-rename portable-tool commits survived extraction by subject/author/date/content, with original source SHAs recorded in `docs/extraction.md` rather than expected to remain identical after path rewriting.
 
 * `pi-experiments` remains unchanged by this unit.
 
@@ -417,17 +442,37 @@ flowchart TB
 
 **Approach:**
 
+* Use this standalone script contract in `package.json`:
+
+```json
+{
+  "scripts": {
+    "lint": "biome check .",
+    "lint:fix": "biome check --write .",
+    "check": "npm run lint && npm run typecheck",
+    "clean": "node scripts/clean-package-dist.mjs",
+    "typecheck": "tsc -b tsconfig.json --pretty false",
+    "build": "npm run clean && tsc -b tsconfig.json",
+    "test": "npm run build && node scripts/run-built-tests.mjs",
+    "verify:dist": "node scripts/verify-bridgekit-dist.mjs",
+    "pack:dry-run": "npm pack --dry-run --json",
+    "package-smoke": "node scripts/smoke-package.mjs",
+    "prepack": "npm run build && npm run verify:dist"
+  }
+}
+```
+
 * Rewrite script root discovery for the standalone repo and remove assumptions about `packages/*`, `../../scripts`, or `pi-experiments`.
 
-* Rewrite the built-test runner to collect tests from standalone `dist/`, not `packages/*/dist`.
+* Rewrite `scripts/run-built-tests.mjs` to recursively collect `*.test.js` under `<repoRoot>/dist/src`, not `packages/*/dist`. It must fail if no tests are found with a standalone error such as `No built test files found under dist/src. Run npm run build first.`
 
 * Keep `prepack` as the package-output gate: build from clean `dist`, verify metadata/public entrypoints/docs/source-map behavior, and fail if unsupported symbols reappear.
 
-* Add a standalone packed-install smoke that creates a temporary consumer, installs the BridgeKit tarball, imports every public runtime subpath, compiles a NodeNext TypeScript fixture, checks package file contents, and proves unsupported deep imports fail.
+* Add a standalone packed-install smoke that creates a temporary consumer with its own `package.json` containing `"type": "module"` and a direct `typebox` dependency matching the standalone package baseline, installs the BridgeKit tarball there with `npm install <tarball> --ignore-scripts`, imports every public runtime subpath with `cwd` set to the temp consumer, compiles a NodeNext TypeScript fixture against installed package declarations (no repo-local path aliases or project references), checks package file contents, and proves unsupported deep imports fail. The smoke may invoke the standalone repo's local TypeScript binary, but module resolution must happen from the temp consumer directory.
 
 * Add pack file-list assertions so `npm pack --json` proves included/excluded files, not only `dist` existence.
 
-* Add verifier checks that standalone scripts and docs do not reference `../../scripts`, `packages/*` build/test assumptions, or `pi-experiments` runtime paths.
+* Add verifier checks that package scripts, built runtime files, and import examples do not rely on monorepo-relative paths such as `../../scripts`, `packages/*/dist`, or `pi-experiments` runtime/build paths. Documentation may mention `pi-experiments` only as future migration or manual fixture-validation context.
 
 **Execution note:** Test-first. Port verifier expectations and packed-install smoke before adjusting scripts to pass.
 
@@ -437,7 +482,7 @@ flowchart TB
 
 * `scripts/run-built-tests.mjs`
 
-* SDK runtime/declaration assertions inside `scripts/smoke-pi-text-utils-package.mjs`
+* SDK runtime/declaration assertions inside `scripts/smoke-pi-text-utils-package.mjs` *(read-only reference only; do not copy fixture-specific paths, edit these scripts, or run fixture rewiring)*
 
 **Test scenarios:**
 
@@ -451,11 +496,11 @@ flowchart TB
 
 * Error path: a temp consumer deep import that is not listed in `exports` fails as expected.
 
-* Regression path: verifier fails if built public files contain `registerMcpTools`, `sourceMappingURL=`, `../../`, `packages/*`, or `pi-experiments` path assumptions.
+* Regression path: verifier fails if built public files contain `registerMcpTools` or `sourceMappingURL=`, if package scripts/import examples rely on `../../scripts`, `packages/*/dist`, or `pi-experiments` runtime/build paths, or if `@modelcontextprotocol/sdk` resolves to an alpha/beta/canary/v2 line during extraction.
 
 **Verification:**
 
-* Standalone lint, typecheck, test, prepack, pack dry-run, and package-smoke flows pass from the new repo.
+* Standalone `npm run check`, `npm run test`, `npm run pack:dry-run`, and `npm run package-smoke` flows pass from the new repo.
 
 * `pi-experiments` remains unchanged by this unit.
 
@@ -479,7 +524,6 @@ flowchart TB
 
 * Modify in `bridgekit`: `examples/README.md`
 
-* Modify in `bridgekit`: `package.json`
 
 **Approach:**
 
@@ -487,7 +531,7 @@ flowchart TB
 
 * Explain that CI, npm trusted publishing, first release, downstream consumer rewiring, and `pi-experiments` cleanup are follow-up work, not part of this extraction.
 
-* Add `docs/releasing.md` as a handoff note for the future release plan: version choice, CI expectation, trusted-publisher setup, provenance check, prerelease/`latest` promotion, bad-version response, and manual `pi-experiments` fixture validation.
+* Add `docs/releasing.md` as a handoff note with placeholders/checklists for future release planning only: CI expectation, trusted-publisher setup, provenance verification, prerelease/`latest` promotion criteria, bad-version response, and future manual fixture-validation gates. Do not choose a release version, run npm publish commands, create tags, create releases, configure npm/GitHub, add workflows, add publish/release scripts, or publish any package in this plan.
 
 * Define maintenance expectations to be filled before publishing: named maintainer or maintainer group, issue triage route, pre-1.0 compatibility stance, and release-blocking bug categories.
 
@@ -545,13 +589,13 @@ flowchart TB
 
 * **Ownership and docs:** Canonical BridgeKit docs begin moving to the standalone repo; `pi-experiments` remains historical/incubator context until a later migration.
 
-* **Unchanged invariants:** TypeBox remains the schema source, modules stay import-passive, no deep imports are supported, no high-level MCP helper returns, and consumers should eventually use normal semver dependency resolution.
+* **Unchanged invariants:** TypeBox remains the schema source, modules stay import-passive, no deep imports are supported, no high-level MCP helper returns, and future consumer migration remains out of scope for this plan beyond noting that it belongs to a later plan.
 
 ---
 
 ## Dependencies / Prerequisites
 
-* The empty standalone repository at `https://github.com/feniix/bridgekit.git`.
+* The empty standalone repository at `https://github.com/feniix/bridgekit.git`, verified with no remote heads or tags before any push.
 
 * Local access to both `pi-experiments` and the new `bridgekit` checkout.
 
@@ -566,6 +610,7 @@ flowchart TB
 | Risk                                                                      | Likelihood | Impact | Mitigation                                                                                                               |
 | :------------------------------------------------------------------------ | ---------: | -----: | :----------------------------------------------------------------------------------------------------------------------- |
 | History-preserving extraction loses or mangles package history            |     Medium |   High | Use a dedicated extraction clone, include both historical package paths, inspect known commits before pushing, and keep the original `pi-experiments` repo untouched. |
+| Target remote is not actually empty                                       |        Low |   High | Preflight with `git ls-remote --heads --tags`; keep extraction local and stop for an explicit push strategy if any refs exist. |
 | Extraction accidentally depends on the deferred MCP SDK v2 alpha migration |     Medium |   High | Source preflight records the current SDK v1 baseline; docs and checks state that MCP SDK v2 remains deferred until it is no longer alpha. |
 | Standalone scripts retain monorepo-relative paths                         |     Medium |   High | Localize scripts in U2 and fail verification on `../../`, `packages/*`, or `pi-experiments` assumptions.                 |
 | Package API changes accidentally during the move                          |     Medium |   High | Add characterization/export checks before and after migration.                                                           |
@@ -598,6 +643,8 @@ flowchart TB
 
 * In `bridgekit`, add `docs/releasing.md` as a future-work handoff, not an active release workflow.
 
+* In `bridgekit`, add `docs/extraction.md` to durably record the source repo absolute path, `git rev-parse HEAD`, before/after `git status --short` output (expected empty), extraction date, MCP SDK v1 baseline, TypeBox baseline, exact filter-repo command/tooling used, target remote preflight output, whether expected source commits were rewritten/pruned, and verification command outputs or pass/fail summaries.
+
 * Do not update `pi-experiments` docs in this phase.
 
 ---
@@ -606,7 +653,7 @@ flowchart TB
 
 * This plan ends before npm publish, before CI setup, before consumer rewiring, and before any `pi-experiments` cleanup.
 
-* Do not enable automated publish or promote a package from the standalone repo until a follow-up release plan adds CI and trusted-publishing gates.
+* Do not enable automated publish or promote a package from the standalone repo until a follow-up release plan adds CI and trusted-publishing gates. MCP SDK v2 remains out of scope for this extraction; any future consideration of v2 requires a separate plan, and this implementation must not evaluate, prototype, or migrate it.
 
 * Keep `packages/bridgekit` in `pi-experiments` as the baseline while the standalone repo is being populated.
 
@@ -630,6 +677,8 @@ flowchart TB
 
 * The standalone package metadata consistently uses Node `>=22.19.0` and points repository/homepage/bugs metadata at `https://github.com/feniix/bridgekit.git`.
 
+* Before any source-of-truth flip or npm publish, a follow-up release plan requires manual fixture validation against a packed tarball. This implementation does not automate, edit, rewire, or run changes through fixture package manifests, scripts, TypeScript configs, lockfiles, package-smoke scripts, or imports.
+
 * `pi-experiments` remains unchanged by this phase and continues to contain the existing BridgeKit package plus fixture examples for a later migration plan.
 
 ---
@@ -644,7 +693,7 @@ flowchart TB
 
 * Current BridgeKit package verifier: `scripts/verify-bridgekit-dist.mjs`
 
-* Fixture package smokes: `scripts/smoke-pi-text-utils-package.mjs`, `scripts/smoke-pi-sequential-thinking-package.mjs`
+* Fixture package smokes: `scripts/smoke-pi-text-utils-package.mjs`, `scripts/smoke-pi-sequential-thinking-package.mjs` *(read-only references only; do not copy fixture-specific paths, edit these scripts, or run fixture rewiring)* *(read-only references only; do not copy fixture-specific paths, edit these scripts, or run fixture rewiring)*
 
 * Fixture packages: `packages/pi-text-utils/package.json`, `packages/pi-sequential-thinking/package.json`
 
